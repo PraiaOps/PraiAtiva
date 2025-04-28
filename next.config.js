@@ -10,12 +10,12 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Configuração essencial para rodar no Vercel com router groups
+  // Configuração para Vercel
   output: 'standalone',
+  distDir: '.next',
   // Configuração experimental simplificada
   experimental: {
     optimizePackageImports: ['@heroicons/react', '@headlessui/react'],
-    outputFileTracingRoot: join(__dirname, '../'),
   },
   // Configuração para debug de revalidação e geração de estáticos
   logging: {
@@ -32,23 +32,23 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'lh3.googleusercontent.com', // Para avatares do Google
+        hostname: 'lh3.googleusercontent.com',
       },
       {
         protocol: 'https',
-        hostname: 'dl.airtable.com', // Para imagens do Airtable
+        hostname: 'dl.airtable.com',
       },
       {
         protocol: 'https',
-        hostname: 'via.placeholder.com', // Para imagens de placeholder
+        hostname: 'via.placeholder.com',
       },
       {
         protocol: 'https',
-        hostname: 'images.unsplash.com', // Para imagens do Unsplash
+        hostname: 'images.unsplash.com',
       },
       {
         protocol: 'https',
-        hostname: 'randomuser.me', // Para avatares de demonstração
+        hostname: 'randomuser.me',
       },
     ],
   },
