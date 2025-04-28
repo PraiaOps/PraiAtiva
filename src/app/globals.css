@@ -1,0 +1,195 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Paleta principal - tons de azul oceânico e coral */
+  --color-primary: #0891B2; /* Azul turquesa vibrante */
+  --color-primary-dark: #0369A1; 
+  --color-primary-light: #22D3EE;
+  --color-secondary: #FB923C; /* Laranja coral sunset */
+  --color-secondary-dark: #F97316;
+  --color-secondary-light: #FDBA74;
+  
+  /* Cores acentuadas */
+  --color-accent-teal: #14B8A6; /* Verde água */
+  --color-accent-sand: #FBBF24; /* Areia dourada */
+  --color-accent-coral: #F43F5E; /* Coral vibrante */
+  
+  /* Cores neutras e background */
+  --color-text-dark: #0F172A;
+  --color-text-light: #F8FAFC;
+  --color-background: #FFFFFF;
+  --color-background-alt: #F1F5F9;
+  --color-background-blue: #E0F2FE;
+}
+
+@layer base {
+  body {
+    @apply text-slate-800 bg-white;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold text-sky-700;
+    letter-spacing: -0.025em;
+  }
+
+  h1 {
+    @apply text-4xl md:text-5xl lg:text-6xl;
+    line-height: 1.1;
+  }
+
+  h2 {
+    @apply text-3xl md:text-4xl;
+    line-height: 1.2;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-sky-600 hover:bg-sky-700 text-white font-medium py-2.5 px-5 rounded-lg shadow-sm transition-all duration-200 relative overflow-hidden;
+  }
+  
+  .btn-secondary {
+    @apply bg-orange-400 hover:bg-orange-500 text-white font-medium py-2.5 px-5 rounded-lg shadow-sm transition-all duration-200;
+  }
+  
+  .btn-outline {
+    @apply border-2 border-sky-600 text-sky-600 hover:bg-sky-600 hover:text-white font-medium py-2.5 px-5 rounded-lg transition-all duration-200;
+  }
+
+  .btn-accent {
+    @apply bg-rose-500 hover:bg-rose-600 text-white font-medium py-2.5 px-5 rounded-lg shadow-sm transition-all duration-200;
+  }
+  
+  .input {
+    @apply w-full px-3 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent;
+  }
+  
+  .label {
+    @apply block text-sm font-medium text-slate-700 mb-1.5;
+  }
+  
+  .card {
+    @apply bg-white rounded-xl shadow-md overflow-hidden border border-slate-100 hover:shadow-lg transition-shadow duration-300;
+  }
+  
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  .hero-section {
+    @apply relative bg-gradient-to-r from-sky-600 to-sky-800 text-white py-20;
+  }
+  
+  .wave-pattern {
+    @apply absolute bottom-0 left-0 w-full overflow-hidden leading-none;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply bg-sky-100 text-sky-800;
+  }
+
+  .badge-secondary {
+    @apply bg-orange-100 text-orange-800;
+  }
+
+  .badge-accent {
+    @apply bg-rose-100 text-rose-800;
+  }
+}
+
+/* Animações */
+@keyframes wave {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-25%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-wave {
+  animation: wave 15s linear infinite;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes pulse-light {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-light {
+  animation: pulse-light 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Gradientes e backgrounds estilizados */
+.beach-gradient {
+  background: linear-gradient(to bottom, rgba(8, 145, 178, 0.9), rgba(14, 165, 233, 0.7));
+}
+
+.sunset-gradient {
+  background: linear-gradient(135deg, #F97316 0%, #FB923C 35%, #FBBF24 100%);
+}
+
+.ocean-gradient {
+  background: linear-gradient(to bottom, #0891B2 0%, #0EA5E9 50%, #22D3EE 100%);
+}
+
+.activity-card {
+  @apply relative overflow-hidden rounded-xl shadow-lg;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.activity-card:hover {
+  transform: translateY(-5px);
+  @apply shadow-xl;
+}
+
+.activity-card::after {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-t from-slate-900/70 to-transparent opacity-60 transition-opacity duration-300;
+  z-index: 1;
+}
+
+.activity-card:hover::after {
+  @apply opacity-40;
+}
+
+.activity-card-content {
+  @apply relative z-10 p-6 text-white;
+}
+
+.praia-badge {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium;
+  background-color: var(--color-secondary);
+  color: white;
+}
