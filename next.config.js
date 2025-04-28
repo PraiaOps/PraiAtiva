@@ -12,7 +12,9 @@ const nextConfig = {
   },
   // Configuração para Vercel
   output: 'standalone',
-  distDir: '.next',
+  poweredByHeader: false,
+  reactStrictMode: true,
+  swcMinify: true,
   // Configuração experimental simplificada
   experimental: {
     optimizePackageImports: ['@heroicons/react', '@headlessui/react'],
