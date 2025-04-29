@@ -10,8 +10,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Configuração para Vercel
-  output: 'standalone',
+  // Configuração para Vercel - Removendo output: 'standalone' que pode causar o problema
   poweredByHeader: false,
   reactStrictMode: true,
   swcMinify: true,
