@@ -10,6 +10,10 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'PraiAtiva - Conectando atividades nas praias',
   description: 'Plataforma que conecta quem busca com quem oferece esporte, lazer e turismo nas praias',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
@@ -23,7 +27,7 @@ export default function RootLayout({
         <AuthProvider>
           <div className="flex flex-col min-h-screen">
             <Header />
-            <main className="flex-grow pt-16">
+            <main className="flex-grow">
               {children}
             </main>
             <Footer />

@@ -132,14 +132,14 @@ export default function AtividadesPage() {
 
   return (
     <>
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-        {/* Header */}
-        <div className="bg-primary-600 py-12 px-4">
-          <div className="container mx-auto max-w-4xl">
-            <h1 className="text-3xl font-bold text-white mb-6 text-center">
+      <div className="min-h-screen bg-gray-50">
+        {/* Header com classe page-header para não sobrepor o conteúdo */}
+        <div className="page-header">
+          <div className="page-header-content container mx-auto max-w-4xl">
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-6 text-center">
               Descubra Atividades nas Praias
             </h1>
-            <div className="relative">
+            <div className="relative max-w-3xl mx-auto">
               <input
                 type="text"
                 placeholder="Busque por atividades, praias ou cidades..."

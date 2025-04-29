@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -10,6 +11,9 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  
+  // Verificar se está na página inicial
+  const isHomePage = pathname === '/';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -23,117 +27,47 @@ export default function Header() {
     setIsMenuOpen(!isMenuOpen);
   };
 
+  // Se estiver na página inicial, o Header já é controlado lá
+  if (isHomePage) {
+    return null;
+  }
+
   return (
     <header className={`fixed w-full z-50 transition-all duration-300 ${
-      isScrolled ? "bg-white/95 backdrop-blur-sm shadow-sm py-2" : "bg-transparent py-4"
+      isScrolled ? "bg-black/80 backdrop-blur-md shadow-md py-2" : "bg-transparent py-4"
     }`}>
-      <div className="container-custom">
+      <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link 
-            href="/" 
-            className={`font-bold text-xl ${isScrolled ? 'text-sky-700' : 'text-white'}`}
-          >
-            <span className="flex items-center">
-              PraiAtiva
-              <span className="inline-block ml-1 text-orange-400 text-2xl">.</span>
-            </span>
+          <Link href="/" className="relative flex items-center h-full z-20">
+            <div className="relative w-48 h-16 md:h-20 md:w-56 transition-all duration-300">
+              <Image
+                src="/images/logo_sem_fundo.png"
+                alt="Logo PraiAtiva"
+                width={200}
+                height={70}
+                className="object-contain drop-shadow-lg"
+                priority
+              />
+            </div>
           </Link>
 
           {/* Navigation Desktop */}
-          <nav className="hidden md:block">
-            <ul className="flex space-x-1">
-              <li>
-                <NavLink 
-                  href="/" 
-                  active={pathname === '/'} 
-                  scrolled={isScrolled}
-                >
-                  Home
-                </NavLink>
-              </li>
-              <li>
-                <NavLink 
-                  href="/atividades" 
-                  active={pathname === '/atividades'} 
-                  scrolled={isScrolled}
-                >
-                  Atividades
-                </NavLink>
-              </li>
-              <li>
-                <NavLink 
-                  href="/sobre" 
-                  active={pathname === '/sobre'} 
-                  scrolled={isScrolled}
-                >
-                  Sobre
-                </NavLink>
-              </li>
-              <li>
-                <NavLink 
-                  href="/contato" 
-                  active={pathname === '/contato'} 
-                  scrolled={isScrolled}
-                >
-                  Contato
-                </NavLink>
-              </li>
-            </ul>
+          <nav className="hidden md:flex items-center space-x-6">
+            <Link href="/" className="text-white font-medium hover:text-blue-300 transition-colors text-sm uppercase tracking-wide">Home</Link>
+            <Link href="/atividades" className="text-white font-medium hover:text-blue-300 transition-colors text-sm uppercase tracking-wide">Atividades</Link>
+            <Link href="/sobre" className="text-white font-medium hover:text-blue-300 transition-colors text-sm uppercase tracking-wide">Sobre</Link>
+            <Link href="/contato" className="text-white font-medium hover:text-blue-300 transition-colors text-sm uppercase tracking-wide">Contato</Link>
           </nav>
 
           {/* Auth Buttons */}
-          <div className="hidden md:flex items-center gap-3">
-            {user ? (
-              <>
-                <Link 
-                  href="/perfil" 
-                  className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full ${
-                    isScrolled 
-                      ? 'text-sky-700 hover:bg-sky-50' 
-                      : 'text-white hover:bg-white/10'
-                  } transition-colors`}
-                >
-                  <div className="w-8 h-8 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center">
-                    {user.email?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <span className="hidden lg:inline">{user.email?.split('@')[0]}</span>
-                </Link>
-                <button 
-                  onClick={signOut}
-                  className={`py-2 px-4 text-sm font-medium rounded-lg ${
-                    isScrolled 
-                      ? 'text-rose-600 hover:bg-rose-50' 
-                      : 'text-white hover:text-rose-500 hover:bg-white'
-                  } transition-colors`}
-                >
-                  Sair
-                </button>
-              </>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  className={`py-2 px-4 text-sm font-medium rounded-lg ${
-                    isScrolled 
-                      ? 'text-sky-700 hover:bg-sky-50' 
-                      : 'text-white hover:bg-white/10'
-                  } transition-colors`}
-                >
-                  Entrar
-                </Link>
-                <Link
-                  href="/cadastro"
-                  className={`py-2 px-4 text-sm font-medium rounded-lg ${
-                    isScrolled 
-                      ? 'bg-sky-600 hover:bg-sky-700 text-white' 
-                      : 'bg-white hover:bg-gray-100 text-sky-700'
-                  } transition-colors`}
-                >
-                  Cadastrar
-                </Link>
-              </>
-            )}
+          <div className="flex items-center space-x-4">
+            <Link href="/login" className="text-white hover:text-blue-300 transition-colors text-sm font-medium">
+              Entrar
+            </Link>
+            <Link href="/cadastro" className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-full transition-colors">
+              Cadastrar
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -144,19 +78,13 @@ export default function Header() {
           >
             <div className={`w-6 h-5 flex flex-col justify-between transition-all duration-200 ${isMenuOpen ? 'justify-center' : ''}`}>
               <span 
-                className={`block h-0.5 rounded-full transition-all duration-300 ${
-                  isScrolled ? 'bg-sky-700' : 'bg-white'
-                } ${isMenuOpen ? 'absolute w-6 rotate-45' : 'w-6'}`}
+                className={`block h-0.5 rounded-full transition-all duration-300 bg-white ${isMenuOpen ? 'absolute w-6 rotate-45' : 'w-6'}`}
               ></span>
               <span 
-                className={`block h-0.5 rounded-full transition-all duration-300 ${
-                  isScrolled ? 'bg-sky-700' : 'bg-white'
-                } ${isMenuOpen ? 'opacity-0' : 'w-4 ml-auto'}`}
+                className={`block h-0.5 rounded-full transition-all duration-300 bg-white ${isMenuOpen ? 'opacity-0' : 'w-4 ml-auto'}`}
               ></span>
               <span 
-                className={`block h-0.5 rounded-full transition-all duration-300 ${
-                  isScrolled ? 'bg-sky-700' : 'bg-white'
-                } ${isMenuOpen ? 'absolute w-6 -rotate-45' : 'w-6'}`}
+                className={`block h-0.5 rounded-full transition-all duration-300 bg-white ${isMenuOpen ? 'absolute w-6 -rotate-45' : 'w-6'}`}
               ></span>
             </div>
           </button>
@@ -165,17 +93,17 @@ export default function Header() {
 
       {/* Mobile Navigation Menu */}
       <div 
-        className={`md:hidden absolute top-full left-0 right-0 bg-white shadow-lg transition-all duration-300 ease-in-out overflow-hidden ${
+        className={`md:hidden absolute top-full left-0 right-0 bg-black/90 backdrop-blur-md shadow-lg transition-all duration-300 ease-in-out overflow-hidden ${
           isMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
-        <div className="container-custom py-4">
+        <div className="container mx-auto py-4 px-4">
           <nav className="mb-6">
             <ul className="space-y-2">
               <li>
                 <Link 
                   href="/" 
-                  className={`block px-4 py-2 rounded-lg ${pathname === '/' ? 'bg-sky-50 text-sky-700 font-medium' : 'text-slate-700 hover:bg-gray-50'}`}
+                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Home
@@ -183,8 +111,44 @@ export default function Header() {
               </li>
               <li>
                 <Link 
+                  href="/sou-aluno" 
+                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Sou Aluno
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/sou-instrutor" 
+                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Sou Instrutor
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/sobre" 
+                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Sobre nós
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/eventos" 
+                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Eventos
+                </Link>
+              </li>
+              <li>
+                <Link 
                   href="/atividades" 
-                  className={`block px-4 py-2 rounded-lg ${pathname === '/atividades' ? 'bg-sky-50 text-sky-700 font-medium' : 'text-slate-700 hover:bg-gray-50'}`}
+                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Atividades
@@ -192,17 +156,8 @@ export default function Header() {
               </li>
               <li>
                 <Link 
-                  href="/sobre" 
-                  className={`block px-4 py-2 rounded-lg ${pathname === '/sobre' ? 'bg-sky-50 text-sky-700 font-medium' : 'text-slate-700 hover:bg-gray-50'}`}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Sobre
-                </Link>
-              </li>
-              <li>
-                <Link 
                   href="/contato" 
-                  className={`block px-4 py-2 rounded-lg ${pathname === '/contato' ? 'bg-sky-50 text-sky-700 font-medium' : 'text-slate-700 hover:bg-gray-50'}`}
+                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Contato
@@ -210,56 +165,22 @@ export default function Header() {
               </li>
             </ul>
           </nav>
-          
-          <hr className="border-slate-200 my-4" />
-          
-          <div className="space-y-3">
-            {user ? (
-              <>
-                <div className="flex items-center gap-3 px-4 py-2">
-                  <div className="w-10 h-10 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-lg font-medium">
-                    {user.email?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <div>
-                    <div className="font-medium text-slate-800">{user.email?.split('@')[0]}</div>
-                    <div className="text-sm text-slate-500">{user.email}</div>
-                  </div>
-                </div>
-                <Link 
-                  href="/perfil" 
-                  className="block w-full px-4 py-2 text-center bg-sky-50 text-sky-700 rounded-lg font-medium"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Meu Perfil
-                </Link>
-                <button 
-                  onClick={() => {
-                    signOut();
-                    setIsMenuOpen(false);
-                  }}
-                  className="block w-full px-4 py-2 text-center bg-rose-50 text-rose-600 rounded-lg font-medium"
-                >
-                  Sair
-                </button>
-              </>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="block w-full px-4 py-2.5 text-center bg-white border border-sky-200 text-sky-700 hover:bg-sky-50 rounded-lg font-medium"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Entrar
-                </Link>
-                <Link
-                  href="/cadastro"
-                  className="block w-full px-4 py-2.5 text-center bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Cadastrar
-                </Link>
-              </>
-            )}
+
+          <div className="flex flex-col gap-2">
+            <Link
+              href="/login"
+              className="w-full py-2 text-center text-sm font-medium text-white hover:text-blue-300 transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Entrar
+            </Link>
+            <Link
+              href="/cadastro"
+              className="w-full py-2 text-center text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Cadastrar
+            </Link>
           </div>
         </div>
       </div>
@@ -279,17 +200,15 @@ function NavLink({ href, active, scrolled, children }: NavLinkProps) {
     <Link 
       href={href} 
       className={`
-        relative px-4 py-2 text-sm font-medium rounded-lg transition-all
+        relative px-3 py-2 text-sm font-medium transition-all
         ${active 
           ? scrolled 
             ? 'text-sky-700 before:bg-sky-700'
             : 'text-white before:bg-white'
           : scrolled 
-            ? 'text-slate-700 hover:text-sky-700 hover:bg-sky-50' 
-            : 'text-white/90 hover:text-white hover:bg-white/10'
+            ? 'text-slate-700 hover:text-sky-700' 
+            : 'text-white/90 hover:text-white'
         }
-        before:content-[''] before:absolute before:h-[3px] before:w-[0%] before:left-[50%] before:bottom-0 before:transition-all before:duration-300
-        ${active ? 'before:w-[calc(100%-30px)] before:left-[15px]' : ''}
       `}
     >
       {children}

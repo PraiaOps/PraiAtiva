@@ -31,11 +31,11 @@ export default function Login() {
   };
 
   return (
-    <main className="flex-1 flex items-center justify-center py-16">
-      <div className="ocean-gradient absolute top-0 left-0 w-full h-full -z-10 opacity-10"></div>
+    <main className="flex-1 py-20">
+      <div className="page-header absolute top-0 left-0 w-full h-64 -z-10"></div>
       
-      <div className="w-full max-w-md mx-auto p-8">
-        <div className="bg-white rounded-2xl shadow-soft overflow-hidden">
+      <div className="w-full max-w-md mx-auto p-8 mt-12">
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="ocean-gradient p-8 text-center">
             <h1 className="text-2xl font-bold text-white">
               Bem-vindo(a) de volta!

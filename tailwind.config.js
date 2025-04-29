@@ -110,7 +110,7 @@ module.exports = {
         ],
       },
       backgroundImage: {
-        'wave-pattern': "url('/images/wave-pattern.svg')",
+        // 'wave-pattern': "url('/images/wave-pattern.svg')",
         'beach-gradient': "linear-gradient(to bottom, rgba(8, 145, 178, 0.9), rgba(14, 165, 233, 0.7))",
         'sunset-gradient': "linear-gradient(135deg, #F97316 0%, #FB923C 35%, #FBBF24 100%)",
         'ocean-gradient': "linear-gradient(to bottom, #0891B2 0%, #0EA5E9 50%, #22D3EE 100%)",
