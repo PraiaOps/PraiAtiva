@@ -31,24 +31,24 @@ export default function Footer() {
           
           <div>
             <h3 className="text-lg font-bold mb-4">Navegação</h3>
-            <ul className="space-y-2">
+            <ul className="space-y-3 md:space-y-2">
               <li>
-                <Link href="/" className="text-gray-300 hover:text-white transition-colors">
+                <Link href="/" className="text-gray-300 hover:text-white transition-colors py-1 block">
                   Início
                 </Link>
               </li>
               <li>
-                <Link href="/atividades" className="text-gray-300 hover:text-white transition-colors">
+                <Link href="/atividades" className="text-gray-300 hover:text-white transition-colors py-1 block">
                   Atividades
                 </Link>
               </li>
               <li>
-                <Link href="/#sobre" className="text-gray-300 hover:text-white transition-colors">
+                <Link href="/#sobre" className="text-gray-300 hover:text-white transition-colors py-1 block">
                   Sobre
                 </Link>
               </li>
               <li>
-                <Link href="/#contato" className="text-gray-300 hover:text-white transition-colors">
+                <Link href="/#contato" className="text-gray-300 hover:text-white transition-colors py-1 block">
                   Contato
                 </Link>
               </li>
@@ -57,19 +57,19 @@ export default function Footer() {
           
           <div>
             <h3 className="text-lg font-bold mb-4">Legal</h3>
-            <ul className="space-y-2">
+            <ul className="space-y-3 md:space-y-2">
               <li>
-                <Link href="/termos" className="text-gray-300 hover:text-white transition-colors">
+                <Link href="/termos" className="text-gray-300 hover:text-white transition-colors py-1 block">
                   Termos de Uso
                 </Link>
               </li>
               <li>
-                <Link href="/privacidade" className="text-gray-300 hover:text-white transition-colors">
+                <Link href="/privacidade" className="text-gray-300 hover:text-white transition-colors py-1 block">
                   Política de Privacidade
                 </Link>
               </li>
               <li>
-                <Link href="/cookies" className="text-gray-300 hover:text-white transition-colors">
+                <Link href="/cookies" className="text-gray-300 hover:text-white transition-colors py-1 block">
                   Política de Cookies
                 </Link>
               </li>

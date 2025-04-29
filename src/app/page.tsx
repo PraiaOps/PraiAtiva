@@ -158,21 +158,21 @@ export default function Home() {
               </h1>
               {/* Melhorando o contraste do texto com o fundo */}
               <div className="bg-black/30 backdrop-blur-sm p-4 rounded-lg md:p-6">
-                <p className="text-xl md:text-2xl text-blue-100 drop-shadow-md">
+                <p className="text-lg md:text-2xl text-blue-100 drop-shadow-md">
                   Encontre e pratique <span className="text-yellow-300 font-semibold">centenas de atividades</span> esportivas nas praias perto de você
                 </p>
               </div>
               
-              <div className="flex flex-col sm:flex-row justify-center gap-4 mt-6">
+              <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mt-6">
                 <Link 
                   href="/atividades" 
-                  className="bg-sky-600 hover:bg-sky-700 text-white font-medium py-3 px-8 rounded-lg transition-colors shadow-sm"
+                  className="bg-sky-600 hover:bg-sky-700 text-white font-medium py-3 px-6 sm:px-8 rounded-lg transition-colors shadow-sm"
                 >
                   Explorar Atividades
                 </Link>
                 <Link 
                   href="/cadastro" 
-                  className="bg-white hover:bg-gray-100 text-sky-700 font-medium py-3 px-8 rounded-lg transition-colors shadow-sm"
+                  className="bg-white hover:bg-gray-100 text-sky-700 font-medium py-3 px-6 sm:px-8 rounded-lg transition-colors shadow-sm"
                 >
                   Começar Agora
                 </Link>

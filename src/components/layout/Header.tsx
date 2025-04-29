@@ -73,7 +73,7 @@ export default function Header() {
           {/* Mobile menu button */}
           <button
             onClick={toggleMenu}
-            className="md:hidden p-2 rounded-md focus:outline-none"
+            className="md:hidden p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-300"
             aria-label="Toggle menu"
           >
             <div className={`w-6 h-5 flex flex-col justify-between transition-all duration-200 ${isMenuOpen ? 'justify-center' : ''}`}>
