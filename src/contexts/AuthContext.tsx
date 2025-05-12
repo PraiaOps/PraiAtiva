@@ -47,6 +47,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   // Carregar dados do usuário do Firestore
+  // Função para converter timestamps do Firestore para objetos Date serializáveis
+  const convertFirestoreTimestamps = (data: any) => {
+    if (!data) return data;
+    
+    const result = { ...data };
+    
+    // Converter todos os campos que podem ser timestamps
+    Object.keys(result).forEach(key => {
+      const value = result[key];
+      
+      // Verificar se é um timestamp do Firestore
+      if (value && typeof value === 'object' && 'seconds' in value && 'nanoseconds' in value) {
+        // Converter para string ISO para garantir serialização
+        result[key] = new Date(value.seconds * 1000).toISOString();
+      }
+    });
+    
+    return result;
+  };
+
   const fetchUserData = async (uid: string) => {
     try {
       const userRef = doc(db, "users", uid);
@@ -55,19 +75,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userSnap = await withTimeout(getDoc(userRef), FIRESTORE_TIMEOUT);
         
         if (userSnap.exists()) {
-          setUserData(userSnap.data());
+          // Converter timestamps antes de definir os dados do usuário
+          setUserData(convertFirestoreTimestamps(userSnap.data()));
         } else {
           const userEmail = user?.email || "";
           
           const basicUserData = {
             email: userEmail,
-            createdAt: new Date(),
-            lastLogin: new Date()
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString()
           };
           
           if (userEmail) {
             try {
-              await withTimeout(setDoc(userRef, basicUserData), FIRESTORE_TIMEOUT);
+              await withTimeout(setDoc(userRef, {
+                email: userEmail,
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp()
+              }), FIRESTORE_TIMEOUT);
               setUserData(basicUserData);
             } catch (error) {
               console.error("Erro ao criar perfil básico:", error);
@@ -81,8 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("Erro ao acessar Firestore:", error);
         setUserData({
           email: user?.email || "",
-          createdAt: new Date(),
-          lastLogin: new Date()
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString()
         });
       }
     } catch (err) {
@@ -145,16 +170,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUserData({
               ...(userData || {}),
               email,
-              createdAt: new Date(),
-              lastLogin: new Date()
+              createdAt: new Date().toISOString(),
+              lastLogin: new Date().toISOString()
             });
           } catch (error) {
             console.warn("Erro ao salvar no Firestore:", error);
             setUserData({
               ...(userData || {}),
               email,
-              createdAt: new Date(),
-              lastLogin: new Date()
+              createdAt: new Date().toISOString(),
+              lastLogin: new Date().toISOString()
             });
           }
         } catch (error) {
@@ -220,7 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.warn("Erro ao atualizar dados de login:", error);
             setUserData({
               email: email,
-              lastLogin: new Date()
+              lastLogin: new Date().toISOString()
             });
             router.push('/'); // Redirecionamento alterado para a página inicial
           }
@@ -273,4 +298,4 @@ export function useAuth() {
     throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
   return context;
-} 
+}

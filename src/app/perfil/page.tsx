@@ -15,7 +15,7 @@ type UserProfile = {
   praiaPrincipal?: string;
   modalidadesEsportivas?: string[];
   linkRede?: string;
-  dataCadastro: any;
+  dataCadastro: string | { seconds: number; nanoseconds: number } | Date | any;
 };
 
 export default function PerfilPage() {
@@ -38,7 +38,20 @@ export default function PerfilPage() {
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
-          setProfile(userDoc.data() as UserProfile);
+          // Converter dados do Firestore para garantir que timestamps sejam serializáveis
+          const userData = userDoc.data();
+          const convertedData = Object.keys(userData).reduce((acc, key) => {
+            const value = userData[key];
+            // Verificar se é um timestamp do Firestore
+            if (value && typeof value === 'object' && 'seconds' in value && 'nanoseconds' in value) {
+              acc[key] = new Date(value.seconds * 1000).toISOString();
+            } else {
+              acc[key] = value;
+            }
+            return acc;
+          }, {} as Record<string, any>);
+          
+          setProfile(convertedData as UserProfile);
         } else {
           setError('Perfil não encontrado');
         }
@@ -140,7 +153,15 @@ export default function PerfilPage() {
                 <div>
                   <p className="text-sm text-gray-500">Data de cadastro</p>
                   <p className="font-medium">
-                    {profile.dataCadastro && new Date(profile.dataCadastro.seconds * 1000).toLocaleDateString('pt-BR')}
+                    {profile.dataCadastro 
+                      ? typeof profile.dataCadastro === 'string'
+                        ? new Date(profile.dataCadastro).toLocaleDateString('pt-BR')
+                        : typeof profile.dataCadastro === 'object' && 'seconds' in profile.dataCadastro
+                          ? new Date(profile.dataCadastro.seconds * 1000).toLocaleDateString('pt-BR')
+                          : profile.dataCadastro instanceof Date
+                            ? profile.dataCadastro.toLocaleDateString('pt-BR')
+                            : 'Data não disponível'
+                      : 'Data não disponível'}
                   </p>
                 </div>
                 
@@ -205,4 +226,4 @@ export default function PerfilPage() {
       </div>
     </div>
   );
-} 
+}
