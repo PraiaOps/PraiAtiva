@@ -205,7 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             // Determinar o redirecionamento com base no tipo de usuário
             const userType = email.toLowerCase();
-            let redirectPath = '/atividades'; // Valor padrão
+            let redirectPath = '/'; // Valor padrão alterado para a página inicial
             
             if (email === 'admin@praiativa.com' || userType.includes('admin')) {
               redirectPath = '/dashboard/admin';
@@ -222,11 +222,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: email,
               lastLogin: new Date()
             });
-            router.push('/atividades');
+            router.push('/'); // Redirecionamento alterado para a página inicial
           }
         } catch (error) {
           console.error("Erro ao atualizar último login:", error);
-          router.push('/atividades');
+          router.push('/'); // Redirecionamento alterado para a página inicial
         }
       }
     } catch (err: any) {

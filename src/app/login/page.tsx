@@ -84,7 +84,7 @@ export default function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input"
+                className="input text-gray-800"
                 placeholder="seu@email.com"
                 required
               />
@@ -104,7 +104,7 @@ export default function Login() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="input"
+                className="input text-gray-800"
                 placeholder="******"
                 required
               />

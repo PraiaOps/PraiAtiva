@@ -12,7 +12,6 @@ import 'swiper/css';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
 import WaveDivider from '@/components/WaveDivider';
-import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
   const [email, setEmail] = useState('');
@@ -23,7 +22,6 @@ export default function Home() {
   const [scrollY, setScrollY] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, userData, signOut } = useAuth();
 
   const [waveVisibility, setWaveVisibility] = useState<{[key: string]: boolean}>({
     qualEABoa: false,
@@ -128,20 +126,6 @@ export default function Home() {
     }
   ];
 
-  // Determinar redirecionamento para dashboard com base no tipo de usuário
-  const getDashboardLink = () => {
-    const userType = userData?.role || '';
-    const email = user?.email?.toLowerCase() || '';
-    
-    if (email === 'admin@praiativa.com' || email.includes('admin') || userType === 'admin') {
-      return '/dashboard/admin';
-    } else if (email.includes('instrutor') || userType === 'instrutor') {
-      return '/dashboard/instrutor';
-    } else {
-      return '/dashboard/aluno';
-    }
-  };
-
   return (
     <>
       <main className="flex flex-col min-h-screen overflow-hidden">
@@ -203,34 +187,12 @@ export default function Home() {
 
                   {/* Auth Buttons Desktop */}
                   <div className="hidden md:flex items-center space-x-4">
-                    {user ? (
-                      <>
-                        <Link 
-                          href={getDashboardLink()} 
-                          className="text-white hover:text-blue-300 transition-colors text-sm font-medium flex items-center"
-                        >
-                          <div className="w-8 h-8 bg-blue-600/60 text-white rounded-full flex items-center justify-center mr-2">
-                            {user.email?.charAt(0).toUpperCase() || 'U'}
-                          </div>
-                          <span>Dashboard</span>
-                        </Link>
-                        <button 
-                          onClick={signOut}
-                          className="text-white hover:text-blue-300 transition-colors text-sm font-medium"
-                        >
-                          Sair
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <Link href="/login" className="text-white hover:text-blue-300 transition-colors text-sm font-medium">
-                          Entrar
-                        </Link>
-                        <Link href="/cadastro" className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-full transition-colors">
-                          Cadastrar
-                        </Link>
-                      </>
-                    )}
+                    <Link href="/login" className="text-white hover:text-blue-300 transition-colors text-sm font-medium">
+                      Entrar
+                    </Link>
+                    <Link href="/cadastro" className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-full transition-colors">
+                      Cadastrar
+                    </Link>
                   </div>
 
                   {/* Mobile menu button */}
@@ -256,12 +218,11 @@ export default function Home() {
 
               {/* Mobile Navigation Menu */}
               <div 
-                className={`md:hidden fixed inset-0 top-16 transform transition-all duration-300 ease-in-out z-40 ${
+                className={`md:hidden fixed inset-0 top-16 bg-black/95 backdrop-blur-lg transform transition-all duration-300 ease-in-out z-40 ${
                   isMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible'
                 }`}
               >
-                {/* Fundo sólido - Esta div garante que o fundo seja completamente preto */}
-                <div className="absolute inset-0 bg-black opacity-100"></div>
+                <div className="absolute inset-0 bg-black/90 backdrop-blur-md"></div>
                 <div className="container mx-auto px-4 py-6 relative z-10">
                   <nav className="flex flex-col space-y-4 mb-8">
                     <Link href="/" className="text-white hover:text-blue-300 transition-colors text-lg font-medium py-2 border-b border-white/10" onClick={toggleMenu}>Home</Link>
@@ -271,46 +232,20 @@ export default function Home() {
                   </nav>
 
                   <div className="flex flex-col space-y-4">
-                    {user ? (
-                      <>
-                        <Link 
-                          href={getDashboardLink()}
-                          className="text-white hover:text-blue-300 py-3 px-6 border border-white/20 rounded-lg text-center transition-colors flex items-center justify-center space-x-2"
-                          onClick={toggleMenu}
-                        >
-                          <div className="w-8 h-8 bg-blue-600/60 text-white rounded-full flex items-center justify-center">
-                            {user.email?.charAt(0).toUpperCase() || 'U'}
-                          </div>
-                          <span>Dashboard</span>
-                        </Link>
-                        <button 
-                          onClick={() => {
-                            signOut();
-                            toggleMenu();
-                          }}
-                          className="bg-red-600/80 hover:bg-red-700 text-white text-lg font-medium py-3 px-6 rounded-lg transition-colors text-center"
-                        >
-                          Sair
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <Link 
-                          href="/login" 
-                          className="text-white hover:text-blue-300 py-3 px-6 border border-white/20 rounded-lg text-center transition-colors"
-                          onClick={toggleMenu}
-                        >
-                          Entrar
-                        </Link>
-                        <Link 
-                          href="/cadastro" 
-                          className="bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium py-3 px-6 rounded-lg transition-colors text-center"
-                          onClick={toggleMenu}
-                        >
-                          Cadastrar
-                        </Link>
-                      </>
-                    )}
+                    <Link 
+                      href="/login" 
+                      className="text-white hover:text-blue-300 py-3 px-6 border border-white/20 rounded-lg text-center transition-colors"
+                      onClick={toggleMenu}
+                    >
+                      Entrar
+                    </Link>
+                    <Link 
+                      href="/cadastro" 
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium py-3 px-6 rounded-lg transition-colors text-center"
+                      onClick={toggleMenu}
+                    >
+                      Cadastrar
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -387,10 +322,10 @@ export default function Home() {
           
           {/* Divisor de ondas */}
           <WaveDivider 
-            position="bottom"
-            primaryColor="#ffffff"
-            secondaryColor="#f0f9ff"
-            tertiaryColor="#e0f2fe"
+            position="bottom" 
+            primaryColor="#0ea5e9"
+            secondaryColor="#0284c7"
+            tertiaryColor="#0c4a6e"
           />
           </div>
         </section>

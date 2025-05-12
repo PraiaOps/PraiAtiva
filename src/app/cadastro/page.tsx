@@ -44,7 +44,7 @@ export default function EscolhaCadastroPage() {
       try {
         // Tentar fazer login diretamente 
         await signInWithEmailAndPassword(auth, email, senha);
-        router.push('/atividades');
+        router.push('/');
       } catch (loginError: any) {
         // Se não existir, criar o usuário
         if (loginError.code === 'auth/user-not-found') {
@@ -52,7 +52,7 @@ export default function EscolhaCadastroPage() {
           try {
             // Criar o usuário
             await createUserWithEmailAndPassword(auth, email, senha);
-            router.push('/atividades');
+            router.push('/');
           } catch (createError: any) {
             // Se não conseguir criar, mostrar mensagem específica
             if (createError.code === 'auth/email-already-in-use') {

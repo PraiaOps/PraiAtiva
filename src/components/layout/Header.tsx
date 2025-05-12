@@ -51,7 +51,7 @@ export default function Header() {
     }
   };
 
-  const headerClasses = `fixed w-full z-50 transition-all duration-300 bg-black/80 backdrop-blur-md shadow-md`;
+  const headerClasses = `fixed w-full z-50 transition-all duration-300 bg-black shadow-md`;
 
   return (
     <div className={headerClasses}>

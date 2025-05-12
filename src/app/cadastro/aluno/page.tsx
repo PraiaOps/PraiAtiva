@@ -67,8 +67,8 @@ export default function CadastroAlunoPage() {
       // Criar usuário com autenticação e salvar dados extras
       await signUp(formData.email, formData.senha, userData);
       
-      // Redirecionar para a página de atividades
-      router.push('/atividades');
+      // Redirecionar para a página inicial em vez de atividades
+      router.push('/');
     } catch (error: any) {
       console.error('Erro ao criar conta:', error);
       if (error.code === 'auth/email-already-in-use') {
@@ -129,7 +129,7 @@ export default function CadastroAlunoPage() {
                     required
                     value={formData.nomeCompleto}
                     onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-800"
                   />
                 </div>
               </div>
@@ -147,7 +147,7 @@ export default function CadastroAlunoPage() {
                     required
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-800"
                   />
                 </div>
               </div>
@@ -165,7 +165,7 @@ export default function CadastroAlunoPage() {
                     required
                     value={formData.senha}
                     onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-800"
                   />
                 </div>
               </div>
@@ -183,7 +183,7 @@ export default function CadastroAlunoPage() {
                     required
                     value={formData.confirmarSenha}
                     onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-800"
                   />
                 </div>
               </div>
@@ -201,7 +201,7 @@ export default function CadastroAlunoPage() {
                       required
                       value={formData.cidade}
                       onChange={handleInputChange}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-800"
                     />
                   </div>
                 </div>
@@ -217,7 +217,7 @@ export default function CadastroAlunoPage() {
                       required
                       value={formData.estado}
                       onChange={handleSelectChange}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-800"
                     >
                       <option value="">Selecione</option>
                       <option value="AC">AC</option>
