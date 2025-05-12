@@ -10,43 +10,61 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user, userData, signOut } = useAuth();
   
-  // Verificar se está na página inicial
   const isHomePage = pathname === '/';
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    if (!isHomePage) {
+      window.addEventListener('scroll', handleScroll);
+      handleScroll(); 
+    }
+    return () => {
+      if (!isHomePage) {
+        window.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [isHomePage]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  // Se estiver na página inicial, o Header já é controlado lá
   if (isHomePage) {
     return null;
   }
 
+  // Determinar redirecionamento para dashboard com base no tipo de usuário
+  const getDashboardLink = () => {
+    const userType = userData?.role || '';
+    const email = user?.email?.toLowerCase() || '';
+    
+    if (email === 'admin@praiativa.com' || email.includes('admin') || userType === 'admin') {
+      return '/dashboard/admin';
+    } else if (email.includes('instrutor') || userType === 'instrutor') {
+      return '/dashboard/instrutor';
+    } else {
+      return '/dashboard/aluno';
+    }
+  };
+
+  const headerClasses = `fixed w-full z-50 transition-all duration-300 bg-black/80 backdrop-blur-md shadow-md`;
+
   return (
-    <header className={`fixed w-full z-50 transition-all duration-300 ${
-      isScrolled ? "bg-black/80 backdrop-blur-md shadow-md py-2" : "bg-transparent py-4"
-    }`}>
+    <div className={headerClasses}>
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between">
+        <div className="h-16 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="relative flex items-center h-full z-20">
-            <div className="relative w-48 h-16 md:h-20 md:w-56 transition-all duration-300">
+            <div className="relative w-36 h-10">
               <Image
                 src="/images/logo_sem_fundo.png"
                 alt="Logo PraiAtiva"
-                width={200}
-                height={70}
-                className="object-contain drop-shadow-lg"
+                fill
+                className="object-contain"
                 priority
               />
             </div>
@@ -60,20 +78,42 @@ export default function Header() {
             <Link href="/contato" className="text-white font-medium hover:text-blue-300 transition-colors text-sm uppercase tracking-wide">Contato</Link>
           </nav>
 
-          {/* Auth Buttons */}
-          <div className="flex items-center space-x-4">
-            <Link href="/login" className="text-white hover:text-blue-300 transition-colors text-sm font-medium">
-              Entrar
-            </Link>
-            <Link href="/cadastro" className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-full transition-colors">
-              Cadastrar
-            </Link>
+          {/* Auth Buttons Desktop */}
+          <div className="hidden md:flex items-center space-x-4">
+            {user ? (
+              <>
+                <Link 
+                  href={getDashboardLink()} 
+                  className="text-white hover:text-blue-300 transition-colors text-sm font-medium flex items-center"
+                >
+                  <div className="w-8 h-8 bg-blue-600/60 text-white rounded-full flex items-center justify-center mr-2">
+                    {user.email?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <span>Dashboard</span>
+                </Link>
+                <button 
+                  onClick={signOut}
+                  className="text-white hover:text-blue-300 transition-colors text-sm font-medium"
+                >
+                  Sair
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="text-white hover:text-blue-300 transition-colors text-sm font-medium">
+                  Entrar
+                </Link>
+                <Link href="/cadastro" className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-full transition-colors">
+                  Cadastrar
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
           <button
             onClick={toggleMenu}
-            className="md:hidden p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="md:hidden p-2 focus:outline-none z-50"
             aria-label="Toggle menu"
           >
             <div className={`w-6 h-5 flex flex-col justify-between transition-all duration-200 ${isMenuOpen ? 'justify-center' : ''}`}>
@@ -93,125 +133,64 @@ export default function Header() {
 
       {/* Mobile Navigation Menu */}
       <div 
-        className={`md:hidden absolute top-full left-0 right-0 bg-black/90 backdrop-blur-md shadow-lg transition-all duration-300 ease-in-out overflow-hidden ${
-          isMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+        className={`md:hidden fixed inset-0 top-16 transform transition-all duration-300 ease-in-out z-40 ${
+          isMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible'
         }`}
       >
-        <div className="container mx-auto py-4 px-4">
-          <nav className="mb-6">
-            <ul className="space-y-2">
-              <li>
-                <Link 
-                  href="/" 
-                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/sou-aluno" 
-                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Sou Aluno
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/sou-instrutor" 
-                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Sou Instrutor
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/sobre" 
-                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Sobre nós
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/eventos" 
-                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Eventos
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/atividades" 
-                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Atividades
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/contato" 
-                  className="block px-4 py-2 rounded-lg text-white hover:text-blue-300 transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Contato
-                </Link>
-              </li>
-            </ul>
+        {/* Fundo sólido - Esta div garante que o fundo seja completamente preto */}
+        <div className="absolute inset-0 bg-black opacity-100"></div>
+        <div className="container mx-auto px-4 py-6 relative z-10">
+          <nav className="flex flex-col space-y-4 mb-8">
+            <Link href="/" className="text-white hover:text-blue-300 transition-colors text-lg font-medium py-2 border-b border-white/10" onClick={toggleMenu}>Home</Link>
+            <Link href="/atividades" className="text-white hover:text-blue-300 transition-colors text-lg font-medium py-2 border-b border-white/10" onClick={toggleMenu}>Atividades</Link>
+            <Link href="/sobre" className="text-white hover:text-blue-300 transition-colors text-lg font-medium py-2 border-b border-white/10" onClick={toggleMenu}>Sobre</Link>
+            <Link href="/contato" className="text-white hover:text-blue-300 transition-colors text-lg font-medium py-2 border-b border-white/10" onClick={toggleMenu}>Contato</Link>
           </nav>
 
-          <div className="flex flex-col gap-2">
-            <Link
-              href="/login"
-              className="w-full py-2 text-center text-sm font-medium text-white hover:text-blue-300 transition-colors"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Entrar
-            </Link>
-            <Link
-              href="/cadastro"
-              className="w-full py-2 text-center text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Cadastrar
-            </Link>
+          <div className="flex flex-col space-y-4">
+            {user ? (
+              <>
+                <Link 
+                  href={getDashboardLink()}
+                  className="text-white hover:text-blue-300 py-3 px-6 border border-white/20 rounded-lg text-center transition-colors flex items-center justify-center space-x-2"
+                  onClick={toggleMenu}
+                >
+                  <div className="w-8 h-8 bg-blue-600/60 text-white rounded-full flex items-center justify-center">
+                    {user.email?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  <span>Dashboard</span>
+                </Link>
+                <button 
+                  onClick={() => {
+                    signOut();
+                    toggleMenu();
+                  }}
+                  className="bg-red-600/80 hover:bg-red-700 text-white text-lg font-medium py-3 px-6 rounded-lg transition-colors text-center"
+                >
+                  Sair
+                </button>
+              </>
+            ) : (
+              <>
+                <Link 
+                  href="/login" 
+                  className="text-white hover:text-blue-300 py-3 px-6 border border-white/20 rounded-lg text-center transition-colors"
+                  onClick={toggleMenu}
+                >
+                  Entrar
+                </Link>
+                <Link 
+                  href="/cadastro" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium py-3 px-6 rounded-lg transition-colors text-center"
+                  onClick={toggleMenu}
+                >
+                  Cadastrar
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
-    </header>
+    </div>
   );
 }
-
-type NavLinkProps = {
-  href: string;
-  active: boolean;
-  scrolled: boolean;
-  children: React.ReactNode;
-}
-
-function NavLink({ href, active, scrolled, children }: NavLinkProps) {
-  return (
-    <Link 
-      href={href} 
-      className={`
-        relative px-3 py-2 text-sm font-medium transition-all
-        ${active 
-          ? scrolled 
-            ? 'text-sky-700 before:bg-sky-700'
-            : 'text-white before:bg-white'
-          : scrolled 
-            ? 'text-slate-700 hover:text-sky-700' 
-            : 'text-white/90 hover:text-white'
-        }
-      `}
-    >
-      {children}
-    </Link>
-  );
-} 

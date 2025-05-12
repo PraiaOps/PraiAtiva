@@ -1,67 +1,86 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/config/firebase';
 
-export default function CadastroPage() {
+export default function EscolhaCadastroPage() {
   const router = useRouter();
-  const { signup } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    passwordConfirm: '',
+  const { signIn } = useAuth();
+  const [isLoading, setIsLoading] = useState({
+    aluno: false,
+    instrutor: false,
+    admin: false
   });
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    if (formData.password !== formData.passwordConfirm) {
-      setError('As senhas não conferem');
-      setIsLoading(false);
-      return;
-    }
-
+  const [loginError, setLoginError] = useState('');
+  
+  // Função para login rápido com usuários predefinidos
+  const handleQuickLogin = async (tipo: 'aluno' | 'instrutor' | 'admin') => {
+    setLoginError('');
+    setIsLoading(prev => ({ ...prev, [tipo]: true }));
+    
     try {
-      // Preparar dados do usuário
-      const userData = {
-        name: formData.name,
-        email: formData.email,
-        role: 'practitioner',
-        preferences: [],
-      };
+      let email: string;
+      let senha: string;
       
-      // Criar conta no Firebase
-      await signup(formData.email, formData.password, userData);
-      
-      // Redirecionar diretamente para a página de atividades
-      router.push('/atividades');
-    } catch (error: any) {
-      console.error('Erro ao criar conta:', error);
-      if (error.code === 'auth/email-already-in-use') {
-        setError('Este e-mail já está sendo usado por outra conta.');
-      } else if (error.code === 'auth/invalid-email') {
-        setError('E-mail inválido.');
-      } else if (error.code === 'auth/weak-password') {
-        setError('A senha é muito fraca.');
-      } else {
-        setError('Ocorreu um erro ao criar sua conta. Tente novamente.');
+      switch (tipo) {
+        case 'aluno':
+          email = 'aluno.teste@praiatativa.com';
+          senha = 'teste123';
+          break;
+        case 'instrutor':
+          email = 'instrutor.teste@praiatativa.com';
+          senha = 'teste123';
+          break;
+        case 'admin':
+          email = 'admin@praiatativa.com';
+          senha = 'admin123';
+          break;
       }
-      setIsLoading(false);
+      
+      try {
+        // Tentar fazer login diretamente 
+        await signInWithEmailAndPassword(auth, email, senha);
+        router.push('/atividades');
+      } catch (loginError: any) {
+        // Se não existir, criar o usuário
+        if (loginError.code === 'auth/user-not-found') {
+          console.log(`Criando usuário de teste ${tipo}...`);
+          try {
+            // Criar o usuário
+            await createUserWithEmailAndPassword(auth, email, senha);
+            router.push('/atividades');
+          } catch (createError: any) {
+            // Se não conseguir criar, mostrar mensagem específica
+            if (createError.code === 'auth/email-already-in-use') {
+              setLoginError(`Erro inesperado: O usuário ${tipo} existe na autenticação mas não foi encontrado. Tente novamente.`);
+            } else {
+              throw createError;
+            }
+          }
+        } else if (loginError.code === 'auth/invalid-credential' || loginError.code === 'auth/wrong-password') {
+          setLoginError(`Senha incorreta para o usuário de teste ${tipo}. Tente criar uma nova conta para teste.`);
+        } else {
+          throw loginError;
+        }
+      }
+    } catch (error: any) {
+      console.error(`Erro ao fazer login rápido como ${tipo}:`, error);
+      
+      // Traduzir mensagens de erro comuns
+      let mensagem = error.message;
+      if (error.code === 'auth/network-request-failed') {
+        mensagem = 'Falha na conexão com a internet. Verifique sua conexão e tente novamente.';
+      } else if (error.code === 'auth/too-many-requests') {
+        mensagem = 'Muitas tentativas de login. Tente novamente mais tarde.';
+      }
+      
+      setLoginError(`Falha no login como ${tipo}. ${mensagem}`);
+    } finally {
+      setIsLoading(prev => ({ ...prev, [tipo]: false }));
     }
   };
 
@@ -71,108 +90,154 @@ export default function CadastroPage() {
         <div className="container mx-auto page-header-content">
           <div className="max-w-md mx-auto text-center">
             <h2 className="text-3xl font-bold text-white">
-              Crie sua conta
+              Escolha o tipo de cadastro
             </h2>
             <p className="mt-2 text-blue-100">
-              Junte-se à comunidade PRAIATIVA e tenha acesso às melhores atividades nas praias
+              Você quer se cadastrar como aluno ou instrutor na comunidade PRAIATIVA?
             </p>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 -mt-16 relative z-10">
-        <div className="max-w-md mx-auto">
+        <div className="max-w-lg mx-auto">
           <div className="bg-white py-8 px-6 shadow-xl rounded-xl">
-            {error && (
-              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-                {error}
+            {loginError && (
+              <div className="mb-6 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
+                {loginError}
               </div>
             )}
             
-            <form className="space-y-6" onSubmit={handleSubmit}>
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Nome completo
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="name"
-                    name="name"
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  Senha
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="passwordConfirm" className="block text-sm font-medium text-gray-700">
-                  Confirmar senha
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="passwordConfirm"
-                    name="passwordConfirm"
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    value={formData.passwordConfirm}
-                    onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
+            <div className="flex flex-col space-y-6">
+              <div className="border border-blue-100 p-6 rounded-lg hover:shadow-md transition-shadow">
+                <h3 className="text-xl font-semibold text-blue-800 mb-3">Cadastro de Aluno</h3>
+                <p className="text-gray-600 mb-4">
+                  Cadastre-se como aluno para participar das atividades e aulas disponíveis nas praias.
+                </p>
+                <ul className="mb-6 text-gray-600 space-y-2">
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Reserva de atividades
+                  </li>
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Avaliação de instrutores
+                  </li>
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Favoritar atividades
+                  </li>
+                </ul>
+                <Link 
+                  href="/cadastro/aluno" 
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
-                  {isLoading ? 'Criando conta...' : 'Criar conta'}
-                </button>
+                  Cadastrar como Aluno
+                </Link>
               </div>
-            </form>
+              
+              <div className="border border-blue-100 p-6 rounded-lg hover:shadow-md transition-shadow">
+                <h3 className="text-xl font-semibold text-blue-800 mb-3">Cadastro de Instrutor</h3>
+                <p className="text-gray-600 mb-4">
+                  Cadastre-se como instrutor para oferecer aulas e atividades na praia.
+                </p>
+                <ul className="mb-6 text-gray-600 space-y-2">
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Criação de atividades
+                  </li>
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Gerenciamento de alunos
+                  </li>
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Configuração de horários
+                  </li>
+                </ul>
+                <Link 
+                  href="/cadastro/instrutor" 
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Cadastrar como Instrutor
+                </Link>
+              </div>
+              
+              <div className="text-center mt-4">
+                <p className="text-gray-600">Já possui uma conta?</p>
+                <Link 
+                  href="/login" 
+                  className="text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Faça login aqui
+                </Link>
+              </div>
+              
+              {/* Botões para testes de login rápido */}
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <h4 className="text-sm font-medium text-gray-600 mb-3">Acesso rápido para testes</h4>
+                <p className="text-xs text-gray-500 mb-3">
+                  Estes botões permitem fazer login com usuários pré-cadastrados para fins de teste.
+                  Os usuários são criados automaticamente na primeira vez que a aplicação é carregada.
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <button 
+                    onClick={() => handleQuickLogin('aluno')}
+                    disabled={isLoading.aluno}
+                    className={`text-xs py-2 px-3 bg-green-100 text-green-800 rounded hover:bg-green-200 flex items-center justify-center ${
+                      isLoading.aluno ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {isLoading.aluno ? (
+                      <svg className="animate-spin h-4 w-4 text-green-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : 'Login como Aluno'}
+                  </button>
+                  <button 
+                    onClick={() => handleQuickLogin('instrutor')}
+                    disabled={isLoading.instrutor}
+                    className={`text-xs py-2 px-3 bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200 flex items-center justify-center ${
+                      isLoading.instrutor ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {isLoading.instrutor ? (
+                      <svg className="animate-spin h-4 w-4 text-yellow-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : 'Login como Instrutor'}
+                  </button>
+                  <button 
+                    onClick={() => handleQuickLogin('admin')}
+                    disabled={isLoading.admin}
+                    className={`text-xs py-2 px-3 bg-red-100 text-red-800 rounded hover:bg-red-200 flex items-center justify-center ${
+                      isLoading.admin ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {isLoading.admin ? (
+                      <svg className="animate-spin h-4 w-4 text-red-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : 'Login como Admin'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

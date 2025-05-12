@@ -1,16 +1,17 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
+// Configuração do Firebase para o projeto praiativa-a417f
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+  apiKey: "AIzaSyAu9bo8fy_L1PxGo6jYEY2IP9gFhdS710g",
+  authDomain: "praiativa-a417f.firebaseapp.com",
+  projectId: "praiativa-a417f",
+  storageBucket: "praiativa-a417f.appspot.com",
+  messagingSenderId: "1058362857760",
+  appId: "1:1058362857760:web:702c94c60462f441445f45",
+  measurementId: "G-Z8SLE3SKKJ"
 };
 
 // Inicializar o Firebase
@@ -18,8 +19,20 @@ const app = initializeApp(firebaseConfig);
 
 // Serviços do Firebase
 export const auth = getAuth(app);
+
+// Configuração do Firestore (agora ativado no console)
 export const db = getFirestore(app);
-// Storage removido temporariamente
+
+// Opção para usar emulador local em ambiente de desenvolvimento
+if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+  try {
+    // Se você estiver usando um emulador Firestore local, descomente a linha abaixo
+    // connectFirestoreEmulator(db, 'localhost', 8080);
+    console.log('Firebase configurado em modo de desenvolvimento');
+  } catch (error) {
+    console.error('Erro ao conectar ao emulador:', error);
+  }
+}
 
 // Inicializar Analytics apenas no navegador
 export const analytics = typeof window !== 'undefined' 

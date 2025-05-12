@@ -22,6 +22,24 @@
   --color-background: #FFFFFF;
   --color-background-alt: #F1F5F9;
   --color-background-blue: #E0F2FE;
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 @layer base {
@@ -44,6 +62,48 @@
     @apply text-3xl md:text-4xl;
     line-height: 1.2;
   }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Reduzir margens padrão nos parágrafos */
+  p {
+    @apply mb-2 last:mb-0;
+  }
+  
+  /* Reduzir margens e paddings padrão nos elementos sem classes específicas */
+  div:not([class]), section:not([class]), article:not([class]) {
+    @apply my-3;
+  }
+  
+  /* Melhorar a experiência de toque em dispositivos móveis */
+  button, 
+  a[role="button"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  .touch-target {
+    min-height: 40px;
+    min-width: 40px;
+  }
+  
+  /* Ajustes para inputs em dispositivos móveis */
+  input, 
+  select, 
+  textarea {
+    font-size: 16px !important; /* Previne zoom automático em iOS */
+  }
+  
+  /* Espaçamento de scroll em iOS */
+  @supports (-webkit-touch-callout: none) {
+    .h-screen {
+      height: -webkit-fill-available;
+    }
+    .min-h-screen {
+      min-height: -webkit-fill-available;
+    }
+  }
 }
 
 @layer components {
@@ -65,9 +125,7 @@
   
   /* Utilidade para melhorar áreas de toque em dispositivos móveis */
   .touch-target {
-    @apply p-3 sm:p-2;
-    min-height: 44px;
-    min-width: 44px;
+    @apply p-2;
   }
   
   .input {
@@ -87,7 +145,7 @@
   }
   
   .hero-section {
-    @apply relative bg-gradient-to-r from-sky-600 to-sky-800 text-white py-20;
+    @apply relative bg-gradient-to-r from-sky-600 to-sky-800 text-white py-16;
   }
   
   .wave-pattern {
@@ -109,6 +167,64 @@
 
   .badge-accent {
     @apply bg-rose-100 text-rose-800;
+  }
+
+  /* Mobile-first responsive text sizes */
+  .text-display {
+    @apply text-xl font-bold md:text-3xl;
+  }
+  
+  .text-title {
+    @apply text-lg font-bold md:text-xl;
+  }
+  
+  .text-subtitle {
+    @apply text-base font-medium md:text-lg;
+  }
+  
+  /* Classes de espaçamento otimizadas */
+  .compact-grid {
+    @apply grid gap-3 sm:gap-4;
+  }
+  
+  .compact-card {
+    @apply p-3 sm:p-4;
+  }
+  
+  .compact-space-y {
+    @apply space-y-3 sm:space-y-4;
+  }
+  
+  .compact-space-x {
+    @apply space-x-2 sm:space-x-3;
+  }
+  
+  .section-spacing {
+    @apply py-6 sm:py-8 md:py-10;
+  }
+  
+  .section-spacing-sm {
+    @apply py-4 sm:py-5 md:py-6;
+  }
+  
+  /* Classe para melhorar a densidade de informações */
+  .dense-layout {
+    @apply space-y-2;
+  }
+  
+  /* Classe para ajustar o layout de componentes com espaçamentos menores */
+  .dense-card {
+    @apply p-2.5 sm:p-3 md:p-4;
+  }
+  
+  /* Classes para páginas internas, com espaçamentos mais compactos */
+  .content-container {
+    @apply py-2 px-2 sm:py-3 sm:px-3 md:py-4 md:px-4;
+  }
+  
+  /* Ajustes para elementos de página */
+  .page-section {
+    @apply mb-4 sm:mb-5 md:mb-6;
   }
 }
 
@@ -302,6 +418,11 @@
   }
 }
 
+/* Esquema de grid responsivo otimizado */
+.responsive-grid {
+  @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4;
+}
+
 @keyframes sand-drift-reverse {
   0% {
     transform: translateX(100%);
@@ -424,4 +545,195 @@ header.fixed {
 .header-scrolled {
   backdrop-filter: blur(8px);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Mobile skeleton loading components */
+@layer utilities {
+  .skeleton {
+    @apply animate-pulse bg-gray-300 rounded;
+  }
+  
+  .skeleton-text {
+    @apply skeleton h-4 w-3/4;
+  }
+  
+  .skeleton-image {
+    @apply skeleton aspect-video;
+  }
+  
+  .skeleton-circle {
+    @apply skeleton rounded-full;
+  }
+  
+  .skeleton-button {
+    @apply skeleton h-[44px] w-full;
+  }
+  
+  /* Safe area insets support */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  
+  .safe-left {
+    padding-left: env(safe-area-inset-left, 0);
+  }
+  
+  .safe-right {
+    padding-right: env(safe-area-inset-right, 0);
+  }
+}
+
+/* Melhorias para telas pequenas em orientação vertical */
+@media screen and (max-width: 375px) {
+  .container {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  
+  /* Ajustar tamanho do texto para telas muito pequenas */
+  .text-xs {
+    font-size: 0.7rem;
+  }
+  
+  /* Otimizações para cabeçalhos em telas muito pequenas */
+  h1 {
+    font-size: 1.75rem;
+  }
+  
+  h2 {
+    font-size: 1.5rem;
+  }
+  
+  /* Garantir que elementos de toque tenham tamanho mínimo adequado */
+  .touch-target, 
+  button, 
+  a[role="button"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Garantir tamanhos mínimos para áreas tocáveis em todas as telas */
+@media screen and (max-width: 640px) {
+  button, 
+  a[role="button"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Garantir que safe areas funcionem bem em dispositivos iOS */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.safe-left {
+  padding-left: env(safe-area-inset-left, 0);
+}
+
+.safe-right {
+  padding-right: env(safe-area-inset-right, 0);
+}
+
+/* Estilos personalizados para o Swiper */
+.swiper {
+  width: 100%;
+  padding-top: 10px;
+  padding-bottom: 50px;
+}
+
+.swiper-slide {
+  height: auto;
+  transition: all 0.3s ease;
+}
+
+.swiper-slide-active {
+  transform: scale(1.02);
+}
+
+/* Removendo os bullets de paginação */
+.swiper-pagination {
+  display: none;
+}
+
+/* Estilizando os botões de navegação */
+.swiper-button-next,
+.swiper-button-prev {
+  color: #0284c7;
+  width: 40px;
+  height: 40px;
+  background: none;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.swiper-button-next:hover,
+.swiper-button-prev:hover {
+  opacity: 1;
+}
+
+.swiper-button-next:after,
+.swiper-button-prev:after {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+/* Ajustando posição dos botões */
+.swiper-button-prev {
+  left: -5px;
+}
+
+.swiper-button-next {
+  right: -5px;
+}
+
+@media (max-width: 640px) {
+  .swiper-button-next,
+  .swiper-button-prev {
+    display: none;
+  }
+  
+  /* Adicionando indicador de swipe em dispositivos móveis */
+  .swiper::after {
+    content: '';
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50px;
+    height: 4px;
+    background: linear-gradient(90deg, #0284c7 30%, transparent 30%, transparent 70%, #0284c7 70%);
+    border-radius: 2px;
+    opacity: 0.5;
+  }
+}
+
+/* Animação de fade para os slides */
+.swiper-slide {
+  opacity: 0.7;
+  transition: all 0.3s ease;
+}
+
+.swiper-slide-active {
+  opacity: 1;
+}
+
+/* Efeito de hover nos cards */
+.swiper-slide:hover {
+  transform: translateY(-5px);
 }

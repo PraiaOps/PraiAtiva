@@ -53,8 +53,8 @@ const eventosData: Evento[] = [
     imagemPrincipal: '/images/eventos/festa-trabalhador.png',
     imagens: [
       '/images/eventos/festa-trabalhador.png',
-      '/images/eventos/areia_calcadao.jpg',
-      '/images/eventos/atividade_mar.jpg'
+      '/images/areia_calcadao.jpg',
+      '/images/atividade_mar.jpg'
     ],
     detalheCompleto: `<p>A tradicional Festa do Trabalhador de Niterói ocorrerá na Praça de Esportes João Saldanha, em Santa Bárbara, oferecendo um dia de diversão, música e atividades para toda a família.</p>
     <p>O evento é uma celebração anual promovida pela Prefeitura Municipal para homenagear os trabalhadores no seu dia. A programação completa do evento ainda será divulgada, mas tradicionalmente inclui shows musicais, atividades esportivas e recreativas, além de praça de alimentação.</p>
@@ -84,8 +84,8 @@ const eventosData: Evento[] = [
     imagemPrincipal: '/images/eventos/vaario2025.webp',
     imagens: [
       '/images/eventos/vaario2025.webp',
-      '/images/eventos/atividade_mar.jpg',
-      '/images/eventos/areia_calcadao.jpg'
+      '/images/atividade_mar.jpg',
+      '/images/areia_calcadao.jpg'
     ],
     detalheCompleto: `<p>Niterói sediará pela primeira vez no Brasil o Campeonato Mundial de Canoa Havaiana (Va'a) em 2025. O evento reunirá competidores de mais de 25 países, sendo uma oportunidade única para os amantes deste esporte.</p>
     <p>As competições serão realizadas nas categorias individuais e equipes, abrangendo diversas distâncias e modalidades. O público terá a oportunidade de assistir às provas a partir da orla, onde também serão instaladas estruturas para transmissão ao vivo e visualização das competições.</p>
@@ -112,9 +112,9 @@ const eventosData: Evento[] = [
     preco: 'R$ 120 por pessoa (competidores)',
     vagas: 150,
     inscritos: 87,
-    imagemPrincipal: '/images/atividades/placeholder-beach-tennis.jpg',
+    imagemPrincipal: '/images/placeholder-beach-tennis.jpg',
     imagens: [
-      '/images/atividades/placeholder-beach-tennis.jpg',
+      '/images/placeholder-beach-tennis.jpg',
       '/images/beach-activities.jpg',
       '/images/beach-hero-sunset.jpg'
     ],
@@ -173,7 +173,13 @@ const eventosData: Evento[] = [
     organizador: 'Rio Beats Productions',
     preco: 'R$ 80 (antecipado)',
     vagas: 500,
-    inscritos: 320
+    inscritos: 320,
+    imagemPrincipal: '/images/beach-activities.jpg',
+    imagens: [
+      '/images/beach-activities.jpg',
+      '/images/beach-hero-sunset.jpg',
+      '/images/beach-hero-sunset.jpg'
+    ],
   },
   {
     id: 6,
@@ -190,7 +196,13 @@ const eventosData: Evento[] = [
     organizador: 'Instituto Foto Praia',
     preco: 'R$ 150',
     vagas: 20,
-    inscritos: 12
+    inscritos: 12,
+    imagemPrincipal: '/images/atividade_mar.jpg',
+    imagens: [
+      '/images/atividade_mar.jpg',
+      '/images/areia_calcadao.jpg',
+      '/images/beach-hero-sunset.jpg'
+    ],
   }
 ];
 
