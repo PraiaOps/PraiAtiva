@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function Home() {
   const [email, setEmail] = useState('');
   const [nome, setNome] = useState('');
+  const [sobrenome, setSobrenome] = useState('');
   const [interesse, setInteresse] = useState('');
   const [enviado, setEnviado] = useState(false);
   const [scrollY, setScrollY] = useState(0);
