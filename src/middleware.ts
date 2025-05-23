@@ -1,32 +1,43 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Define protected routes and their required roles
+const protectedRoutes = {
+  '/dashboard/admin': ['admin'],
+  '/dashboard/instrutor': ['instructor'],
+  '/dashboard/empreendedor': ['entrepreneur'],
+  '/dashboard/aluno': ['student', 'instructor', 'admin', 'entrepreneur']
+};
+
 // Middleware para tratamento de rotas
 export function middleware(request: NextRequest) {
-  // Obtém o caminho atual da URL
-  const url = request.nextUrl.clone();
-  const { pathname } = url;
-
-  // Se estiver na raiz, não é necessário fazer nada
-  // Já vai ser direcionado para a página inicial (app/page.tsx)
-  if (pathname === '/') {
-    return NextResponse.next();
+  const { pathname } = request.nextUrl;
+  
+  // Get auth session from cookie
+  const authSession = request.cookies.get('session')?.value;
+  
+  // Check if the route is protected
+  const isProtectedRoute = Object.keys(protectedRoutes).some(route => pathname.startsWith(route));
+  
+  if (isProtectedRoute) {
+    // If no session, redirect to login
+    if (!authSession) {
+      const url = new URL('/login', request.url);
+      url.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(url);
+    }
   }
-
-  // Permite acesso normal a outras rotas
+  
+  // If not protected or has session, allow access
   return NextResponse.next();
 }
 
-// Configuração para quais caminhos o middleware deve ser executado
+// Define which routes should be processed by this middleware
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (arquivos estáticos)
-     * - _next/image (otimização de imagens do Next.js)
-     * - favicon.ico (favicon)
-     * - public files (arquivos dentro da pasta public)
-     */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-  ],
-}; 
+    '/dashboard/:path*',
+    '/perfil/:path*',
+    '/atividades/criar',
+    '/atividades/editar/:path*'
+  ]
+};

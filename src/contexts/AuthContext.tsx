@@ -67,76 +67,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
-  const fetchUserData = async (uid: string) => {
-    try {
-      const userRef = doc(db, "users", uid);
-      
-      try {
-        const userSnap = await withTimeout(getDoc(userRef), FIRESTORE_TIMEOUT);
-        
-        if (userSnap.exists()) {
-          // Converter timestamps antes de definir os dados do usuário
-          setUserData(convertFirestoreTimestamps(userSnap.data()));
-        } else {
-          const userEmail = user?.email || "";
-          
-          const basicUserData = {
-            email: userEmail,
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString()
-          };
-          
-          if (userEmail) {
-            try {
-              await withTimeout(setDoc(userRef, {
-                email: userEmail,
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp()
-              }), FIRESTORE_TIMEOUT);
-              setUserData(basicUserData);
-            } catch (error) {
-              console.error("Erro ao criar perfil básico:", error);
-              setUserData(basicUserData);
-            }
-          } else {
-            setUserData(basicUserData);
-          }
-        }
-      } catch (error) {
-        console.error("Erro ao acessar Firestore:", error);
-        setUserData({
-          email: user?.email || "",
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString()
-        });
-      }
-    } catch (err) {
-      console.error("Erro ao buscar dados do usuário:", err);
-    }
-  };
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       
+      // Update session cookie
       if (user) {
         try {
-          // Verificar se é o admin pelo email
-          const isAdmin = user.email === 'admin@praiativa.com';
+          // Get id token
+          const idToken = await user.getIdToken();
           
-          // Carregar dados do usuário
-          await fetchUserData(user.uid);
+          // Set session cookie
+          document.cookie = `session=${idToken}; path=/; max-age=3600; samesite=strict`;
+        } catch (error) {
+          console.error("Erro ao atualizar cookie de sessão:", error);
+        }
+      } else {
+        // Clear session cookie on logout
+        document.cookie = 'session=; path=/; max-age=0';
+      }
+      
+      if (user) {
+        try {
+          // First check if user exists in Firestore
+          const userRef = doc(db, "users", user.uid);
+          const userDoc = await getDoc(userRef);
           
-          // Adicionar informação de admin ao userData
-          if (isAdmin && userData) {
-            setUserData(prevData => ({
-              ...prevData,
-              isAdmin: true,
-              role: 'admin'
-            }));
+          // Get stored user data or create new profile
+          let storedUserData = userDoc.exists() ? userDoc.data() : null;
+          
+          if (!storedUserData) {
+            // Create new user profile with default role
+            storedUserData = {
+              email: user.email,
+              createdAt: serverTimestamp(),
+              lastLogin: serverTimestamp(),
+              role: 'student' // default role
+            };
+            
+            // Save new user profile
+            await setDoc(userRef, storedUserData);
           }
+          
+          // Determine role based on stored data or email pattern
+          const email = user.email?.toLowerCase() || '';
+          let role = storedUserData.role || 'student';
+          
+          // Update role based on email patterns if not already set
+          if (!storedUserData.role) {
+            if (email === 'admin@praiativa.com' || email.includes('admin')) {
+              role = 'admin';
+            } else if (email.includes('instrutor') || storedUserData.isInstructor) {
+              role = 'instructor';
+            } else if (email.includes('empreendedor')) {
+              role = 'entrepreneur';
+            }
+            
+            // Update role in Firestore if it changed
+            await setDoc(userRef, { role }, { merge: true });
+            storedUserData.role = role;
+          }
+          
+          // Convert timestamps and set user data
+          const userData = {
+            ...convertFirestoreTimestamps(storedUserData),
+            role: storedUserData.role,
+            isAdmin: storedUserData.role === 'admin',
+            isInstructor: storedUserData.role === 'instructor',
+            isEntrepreneur: storedUserData.role === 'entrepreneur'
+          };
+          
+          setUserData(userData);
         } catch (error) {
           console.error("Erro ao carregar dados do usuário:", error);
+          setUserData({
+            email: user.email,
+            role: 'student',
+            lastLogin: new Date().toISOString()
+          });
         }
       } else {
         setUserData(null);
@@ -147,6 +155,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     return () => unsubscribe();
   }, []);
+
+  const fetchUserData = async (uid: string) => {
+    try {
+      const userRef = doc(db, "users", uid);
+      
+      const userSnap = await withTimeout(getDoc(userRef), FIRESTORE_TIMEOUT);
+      let storedUserData;
+      
+      if (userSnap.exists()) {
+        storedUserData = userSnap.data();
+        // If role is not set, determine it based on email
+        if (!storedUserData.role) {
+          const email = storedUserData.email.toLowerCase();
+          let role = 'student';
+          
+          if (email === 'admin@praiativa.com' || email.includes('admin')) {
+            role = 'admin';
+          } else if (email.includes('instrutor') || storedUserData.isInstructor) {
+            role = 'instructor';
+          } else if (email.includes('empreendedor')) {
+            role = 'entrepreneur';
+          }
+          
+          // Update role in Firestore
+          await withTimeout(
+            setDoc(userRef, { role }, { merge: true }),
+            FIRESTORE_TIMEOUT
+          );
+          storedUserData.role = role;
+        }
+        
+        // Convert timestamps and set user data
+        const userData = {
+          ...convertFirestoreTimestamps(storedUserData),
+          role: storedUserData.role,
+          isAdmin: storedUserData.role === 'admin',
+          isInstructor: storedUserData.role === 'instructor'
+        };
+        
+        setUserData(userData);
+      } else {
+        const userEmail = user?.email || "";
+        const basicUserData = {
+          email: userEmail,
+          role: 'student',
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString()
+        };
+        
+        if (userEmail) {
+          try {
+            await withTimeout(setDoc(userRef, {
+              email: userEmail,
+              role: 'student',
+              createdAt: serverTimestamp(),
+              lastLogin: serverTimestamp()
+            }), FIRESTORE_TIMEOUT);
+            setUserData(basicUserData);
+          } catch (error) {
+            console.error("Erro ao criar perfil básico:", error);
+            setUserData(basicUserData);
+          }
+        } else {
+          setUserData(basicUserData);
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao buscar dados do usuário:", err);
+      setUserData({
+        email: user?.email || "",
+        role: 'student',
+        createdAt: new Date().toISOString(),
+        lastLogin: new Date().toISOString()
+      });
+    }
+  };
 
   const signUp = async (email: string, password: string, userData?: any): Promise<UserCredential> => {
     try {
@@ -209,55 +293,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       setError(null);
-      
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
       if (userCredential.user) {
         try {
           const userRef = doc(db, "users", userCredential.user.uid);
           
-          try {
-            await withTimeout(
-              setDoc(userRef, { 
-                lastLogin: serverTimestamp(),
-                email: email
-              }, { merge: true }),
-              FIRESTORE_TIMEOUT
-            );
+          // Update last login timestamp
+          await withTimeout(
+            setDoc(userRef, { 
+              lastLogin: serverTimestamp() 
+            }, { merge: true }),
+            FIRESTORE_TIMEOUT
+          );
+          
+          // Fetch user data to determine the redirection
+          const userDoc = await getDoc(userRef);
+          let redirectPath = '/';
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const role = userData.role || 'student';
             
-            // Buscar dados do usuário para determinar o redirecionamento
-            await fetchUserData(userCredential.user.uid);
-            
-            // Determinar o redirecionamento com base no tipo de usuário
-            const userType = email.toLowerCase();
-            let redirectPath = '/'; // Valor padrão alterado para a página inicial
-            
-            if (email === 'admin@praiativa.com' || userType.includes('admin')) {
-              redirectPath = '/dashboard/admin';
-            } else if (userType.includes('instrutor')) {
-              redirectPath = '/dashboard/instrutor';
-            } else {
-              redirectPath = '/dashboard/aluno';
+            // Determine redirect based on role
+            switch (role) {
+              case 'admin':
+                redirectPath = '/dashboard/admin';
+                break;
+              case 'instructor':
+                redirectPath = '/dashboard/instrutor';
+                break;
+              case 'entrepreneur':
+                redirectPath = '/dashboard/empreendedor';
+                break;
+              case 'student':
+                redirectPath = '/dashboard/aluno';
+                break;
+              default:
+                redirectPath = '/';
             }
-            
-            router.push(redirectPath);
-          } catch (error) {
-            console.warn("Erro ao atualizar dados de login:", error);
-            setUserData({
-              email: email,
-              lastLogin: new Date().toISOString()
-            });
-            router.push('/'); // Redirecionamento alterado para a página inicial
           }
+          
+          router.push(redirectPath);
         } catch (error) {
           console.error("Erro ao atualizar último login:", error);
-          router.push('/'); // Redirecionamento alterado para a página inicial
+          router.push('/');
         }
       }
     } catch (err: any) {
       console.error("Erro de login:", err);
       
-      // Mensagens de erro simplificadas
       if (['auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/user-not-found', 'auth/wrong-password'].includes(err.code)) {
         setError('E-mail ou senha incorretos');
       } else if (err.code === 'auth/invalid-email') {
@@ -278,8 +363,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await firebaseSignOut(auth);
       setUser(null);
       setUserData(null);
-      // Força redirecionamento para a página inicial após logout
-      window.location.href = '/';
+      router.push('/');
     } catch (err) {
       console.error("Erro ao fazer logout:", err);
     }

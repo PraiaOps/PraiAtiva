@@ -1,11 +1,12 @@
 // Tipos de Usuários
 export interface User {
   id: string;
+  uid: string;
   name: string;
   email: string;
   phone?: string;
   photoURL?: string;
-  role: 'practitioner' | 'entrepreneur' | 'admin';
+  role: 'practitioner' | 'entrepreneur' | 'admin' | 'student' | 'instructor';
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -176,4 +177,84 @@ export interface Credential {
   expiryDate?: Date | string;
   documentUrl?: string;
   verified: boolean;
-} 
+}
+
+// Tipo para Status de Matrícula
+export type EnrollmentStatus = 
+  | 'pending' // Aguardando confirmação
+  | 'confirmed' // Confirmada
+  | 'cancelled' // Cancelada
+  | 'completed' // Concluída
+  | 'refunded'; // Reembolsada
+
+// Tipo para Matrícula
+export interface Enrollment {
+  id: string;
+  studentId: string;
+  instructorId: string;
+  activityId: string;
+  created: Date | string;
+  updated: Date | string;
+  status: EnrollmentStatus;  paymentInfo: {
+    amount: number;
+    commission: number; // Comissão da plataforma (15%)
+    instructorAmount: number; // Valor líquido do instrutor (85%)
+    paymentMethod: 'pix';
+    paymentStatus: 'pending' | 'paid' | 'refunded';
+    paymentDate: Date | string;
+  };
+  attendance: {
+    present: boolean;
+    date?: Date | string;
+    notes?: string;
+  }[];
+  studentDetails: {
+    name: string;
+    email: string;
+    phone?: string;
+    photo?: string;
+  };
+  activityDetails: {
+    name: string;
+    type: ActivityType;
+    location: string;
+    schedule: {
+      date: Date | string;
+      startTime: string;
+      endTime: string;
+    };
+  };
+}
+
+// Tipo para Transação Financeira
+export interface Transaction {
+  id: string;
+  enrollmentId: string;
+  type: 'payment' | 'refund';
+  amount: number;
+  commission: number;
+  instructorAmount: number;
+  status: 'pending' | 'completed' | 'failed';
+  stripeTransactionId?: string;
+  createdAt: Date | string;
+  completedAt?: Date | string;
+  metadata?: {
+    [key: string]: any;
+  };
+}
+
+// Tipo para Resumo Financeiro do Instrutor
+export interface InstructorFinancialSummary {
+  totalEarnings: number;
+  pendingAmount: number;
+  periodEarnings: {
+    period: string;
+    amount: number;
+    enrollments: number;
+  }[];
+  commissionRate: number;
+  nextPayout?: {
+    amount: number;
+    estimatedDate: Date | string;
+  };
+}

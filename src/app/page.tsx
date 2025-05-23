@@ -12,11 +12,11 @@ import 'swiper/css';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
 import WaveDivider from '@/components/WaveDivider';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
   const [email, setEmail] = useState('');
   const [nome, setNome] = useState('');
-  const [sobrenome, setSobrenome] = useState('');
   const [interesse, setInteresse] = useState('');
   const [enviado, setEnviado] = useState(false);
   const [scrollY, setScrollY] = useState(0);
@@ -138,8 +138,8 @@ export default function Home() {
             }}
           >
             <Image 
-              src="/images/beach-hero-sunset.jpg" 
-              alt="Silhuetas de pessoas praticando esportes na praia ao pôr do sol" 
+              src="/images/beach-hero-sunset.jpg"
+              alt="Silhuetas de pessoas praticando esportes na praia ao pôr do sol"
               fill 
               priority
               quality={100}
@@ -150,107 +150,13 @@ export default function Home() {
                 transform: 'scale(1.1)'
               }}
             />
-            
             {/* Overlay gradiente aprimorado para melhor contraste */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-transparent"></div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
             <div className="absolute inset-0 bg-sky-900/10"></div>
           </div>
-          
           {/* Conteúdo principal do hero */}
           <div className="container mx-auto px-4 relative z-10 min-h-[85vh] flex flex-col">
-            {/* Header com efeito glass - Com efeito de scroll */}
-            <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled || isMenuOpen ? 'bg-black/80 backdrop-blur-md shadow-md' : 'bg-transparent'}`}>
-              <div className="container mx-auto px-4">
-                <div className="h-16 flex items-center justify-between">
-                  {/* Logo */}
-                  <Link href="/" className="relative flex items-center h-full z-20">
-                    <div className="relative w-36 h-10">
-                      <Image
-                        src="/images/logo_sem_fundo.png"
-                        alt="Logo PraiAtiva"
-                        width={144}
-                        height={40}
-                        className="object-contain"
-                        priority
-                      />
-                    </div>
-                  </Link>
-
-                  {/* Navigation Desktop */}
-                  <nav className="hidden md:flex items-center space-x-6">
-                    <Link href="/" className="text-white font-medium hover:text-blue-300 transition-colors text-sm uppercase tracking-wide">Home</Link>
-                    <Link href="/atividades" className="text-white font-medium hover:text-blue-300 transition-colors text-sm uppercase tracking-wide">Atividades</Link>
-                    <Link href="/sobre" className="text-white font-medium hover:text-blue-300 transition-colors text-sm uppercase tracking-wide">Sobre</Link>
-                    <Link href="/contato" className="text-white font-medium hover:text-blue-300 transition-colors text-sm uppercase tracking-wide">Contato</Link>
-                  </nav>
-
-                  {/* Auth Buttons Desktop */}
-                  <div className="hidden md:flex items-center space-x-4">
-                    <Link href="/login" className="text-white hover:text-blue-300 transition-colors text-sm font-medium">
-                      Entrar
-                    </Link>
-                    <Link href="/cadastro" className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-full transition-colors">
-                      Cadastrar
-                    </Link>
-                  </div>
-
-                  {/* Mobile menu button */}
-                  <button
-                    onClick={toggleMenu}
-                    className="md:hidden p-2 focus:outline-none z-50"
-                    aria-label="Toggle menu"
-                  >
-                    <div className={`w-6 h-5 flex flex-col justify-between transition-all duration-200 ${isMenuOpen ? 'justify-center' : ''}`}>
-                      <span 
-                        className={`block h-0.5 rounded-full transition-all duration-300 bg-white ${isMenuOpen ? 'absolute w-6 rotate-45' : 'w-6'}`}
-                      ></span>
-                      <span 
-                        className={`block h-0.5 rounded-full transition-all duration-300 bg-white ${isMenuOpen ? 'opacity-0' : 'w-4 ml-auto'}`}
-                      ></span>
-                      <span 
-                        className={`block h-0.5 rounded-full transition-all duration-300 bg-white ${isMenuOpen ? 'absolute w-6 -rotate-45' : 'w-6'}`}
-                      ></span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Mobile Navigation Menu */}
-              <div 
-                className={`md:hidden fixed inset-0 top-16 bg-black/95 backdrop-blur-lg transform transition-all duration-300 ease-in-out z-40 ${
-                  isMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible'
-                }`}
-              >
-                <div className="absolute inset-0 bg-black/90 backdrop-blur-md"></div>
-                <div className="container mx-auto px-4 py-6 relative z-10">
-                  <nav className="flex flex-col space-y-4 mb-8">
-                    <Link href="/" className="text-white hover:text-blue-300 transition-colors text-lg font-medium py-2 border-b border-white/10" onClick={toggleMenu}>Home</Link>
-                    <Link href="/atividades" className="text-white hover:text-blue-300 transition-colors text-lg font-medium py-2 border-b border-white/10" onClick={toggleMenu}>Atividades</Link>
-                    <Link href="/sobre" className="text-white hover:text-blue-300 transition-colors text-lg font-medium py-2 border-b border-white/10" onClick={toggleMenu}>Sobre</Link>
-                    <Link href="/contato" className="text-white hover:text-blue-300 transition-colors text-lg font-medium py-2 border-b border-white/10" onClick={toggleMenu}>Contato</Link>
-                  </nav>
-
-                  <div className="flex flex-col space-y-4">
-                    <Link 
-                      href="/login" 
-                      className="text-white hover:text-blue-300 py-3 px-6 border border-white/20 rounded-lg text-center transition-colors"
-                      onClick={toggleMenu}
-                    >
-                      Entrar
-                    </Link>
-                    <Link 
-                      href="/cadastro" 
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium py-3 px-6 rounded-lg transition-colors text-center"
-                      onClick={toggleMenu}
-                    >
-                      Cadastrar
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Conteúdo centralizado */}
             <div className="mt-16 md:mt-24 max-w-3xl mx-auto text-center">
               {/* Badge de lançamento */}
