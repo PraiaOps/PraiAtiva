@@ -91,7 +91,7 @@ export default function CadastroInstrutorPage() {
         praiaPrincipal: formData.praiaPrincipal,
         linkRede: formData.linkRede || null,
         modalidadesEsportivas: selectedModalidades,
-        role: 'instrutor',
+        role: 'instructor', // Corrigido para inglês
         aprovado: false, // Instrutores precisam ser aprovados pelo admin
       };
       
@@ -338,4 +338,4 @@ export default function CadastroInstrutorPage() {
       </div>
     </div>
   );
-} 
+}

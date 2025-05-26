@@ -41,7 +41,7 @@ const testUsers = [
     userData: {
       nomeCompleto: 'Aluno Teste',
       email: 'aluno.teste@praiatativa.com',
-      role: 'aluno',
+      role: 'student', // Corrigido para inglês
       cidade: 'Rio de Janeiro',
       estado: 'RJ',
       dataCadastro: new Date()
@@ -53,7 +53,7 @@ const testUsers = [
     userData: {
       nomeCompleto: 'Instrutor Teste',
       email: 'instrutor.teste@praiatativa.com',
-      role: 'instrutor',
+      role: 'instructor', // Corrigido para inglês
       cidade: 'Rio de Janeiro',
       estado: 'RJ',
       praiaPrincipal: 'Copacabana',
@@ -118,4 +118,4 @@ async function createAllTestUsers() {
 createAllTestUsers().catch(error => {
   console.error('Erro no script:', error);
   process.exit(1);
-}); 
+});

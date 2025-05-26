@@ -11,7 +11,7 @@ const testUsers = [
       nomeCompleto: 'Aluno Teste',
       cidade: 'Rio de Janeiro',
       estado: 'RJ',
-      role: 'aluno',
+      role: 'student', // Corrigido para inglês
     }
   },
   {
@@ -23,7 +23,7 @@ const testUsers = [
       estado: 'RJ',
       praiaPrincipal: 'Copacabana',
       modalidadesEsportivas: ['Surfe', 'Stand Up Paddle'],
-      role: 'instrutor',
+      role: 'instructor', // Corrigido para inglês
       aprovado: true,
     }
   },
@@ -81,4 +81,4 @@ export async function ensureTestUsers() {
   } catch (error) {
     console.error('Erro ao verificar/criar usuários de teste:', error);
   }
-} 
+}

@@ -232,48 +232,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Função utilitária para normalizar o campo role
+  function normalizeRole(role: string | undefined, email: string | undefined): string {
+    if (!role || !['admin','instructor','entrepreneur','student'].includes(role)) {
+      if (!email) return 'student';
+      const lower = email.toLowerCase();
+      if (lower === 'admin@praiativa.com' || lower.includes('admin')) return 'admin';
+      if (lower.includes('instrutor') || lower.includes('instructor')) return 'instructor';
+      if (lower.includes('empreendedor') || lower.includes('entrepreneur')) return 'entrepreneur';
+      return 'student';
+    }
+    if (role === 'instrutor') return 'instructor';
+    if (role === 'aluno') return 'student';
+    return role;
+  }
+
   const signUp = async (email: string, password: string, userData?: any): Promise<UserCredential> => {
     try {
       setError(null);
-      
+      console.log('[AuthContext] signUp: criando usuário no Auth', email, userData);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
       if (userCredential.user) {
         try {
           const userRef = doc(db, "users", userCredential.user.uid);
-          
-          const dataToSave = {
+          let dataToSave = {
             ...(userData || {}),
             email: email,
             createdAt: serverTimestamp(),
-            lastLogin: serverTimestamp()
+            lastLogin: serverTimestamp(),
           };
-          
-          try {
-            await withTimeout(setDoc(userRef, dataToSave), FIRESTORE_TIMEOUT);
-            setUserData({
-              ...(userData || {}),
-              email,
-              createdAt: new Date().toISOString(),
-              lastLogin: new Date().toISOString()
-            });
-          } catch (error) {
-            console.warn("Erro ao salvar no Firestore:", error);
-            setUserData({
-              ...(userData || {}),
-              email,
-              createdAt: new Date().toISOString(),
-              lastLogin: new Date().toISOString()
-            });
-          }
+          dataToSave.role = normalizeRole(dataToSave.role, email);
+          console.log('[AuthContext] signUp: salvando no Firestore', userRef.path, dataToSave);
+          await withTimeout(setDoc(userRef, dataToSave, { merge: true }), FIRESTORE_TIMEOUT);
+          setUserData({
+            ...(userData || {}),
+            email,
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString(),
+            role: dataToSave.role,
+          });
         } catch (error) {
-          console.error("Erro ao salvar dados do usuário:", error);
+          console.warn('[AuthContext] Erro ao salvar no Firestore:', error);
+          setUserData({
+            ...(userData || {}),
+            email,
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString(),
+            role: normalizeRole(userData?.role, email),
+          });
         }
       }
-      
       return userCredential;
     } catch (err: any) {
-      console.error("Erro ao criar conta:", err);
+      console.error('[AuthContext] Erro ao criar conta:', err);
       
       // Traduzir mensagens de erro do Firebase para português
       if (err.code === 'auth/email-already-in-use') {
@@ -293,47 +304,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       setError(null);
+      console.log('[AuthContext] signIn: tentando login', email);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
       if (userCredential.user) {
         try {
           const userRef = doc(db, "users", userCredential.user.uid);
-          
-          // Update last login timestamp
-          await withTimeout(
-            setDoc(userRef, { 
-              lastLogin: serverTimestamp() 
-            }, { merge: true }),
-            FIRESTORE_TIMEOUT
-          );
-          
-          // Fetch user data to determine the redirection
           const userDoc = await getDoc(userRef);
-          let redirectPath = '/';
-          
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            const role = userData.role || 'student';
-            
-            // Determine redirect based on role
-            switch (role) {
-              case 'admin':
-                redirectPath = '/dashboard/admin';
-                break;
-              case 'instructor':
-                redirectPath = '/dashboard/instrutor';
-                break;
-              case 'entrepreneur':
-                redirectPath = '/dashboard/empreendedor';
-                break;
-              case 'student':
-                redirectPath = '/dashboard/aluno';
-                break;
-              default:
-                redirectPath = '/';
-            }
+          let userData = userDoc.exists() ? userDoc.data() : {};
+          userData.role = normalizeRole(userData.role, userCredential.user.email || undefined);
+          if (!userDoc.exists()) {
+            userData = {
+              email: userCredential.user.email,
+              role: userData.role,
+              createdAt: serverTimestamp(),
+              lastLogin: serverTimestamp(),
+            };
+            console.log('[AuthContext] signIn: criando perfil mínimo no Firestore', userRef.path, userData);
+          } else {
+            userData.lastLogin = serverTimestamp();
+            console.log('[AuthContext] signIn: atualizando perfil no Firestore', userRef.path, userData);
           }
-          
+          await withTimeout(setDoc(userRef, userData, { merge: true }), FIRESTORE_TIMEOUT);
+          // Redirecionamento
+          let redirectPath = '/';
+          switch (userData.role) {
+            case 'admin':
+              redirectPath = '/dashboard/admin';
+              break;
+            case 'instructor':
+              redirectPath = '/dashboard/instrutor';
+              break;
+            case 'entrepreneur':
+              redirectPath = '/dashboard/empreendedor';
+              break;
+            case 'student':
+              redirectPath = '/dashboard/aluno';
+              break;
+            default:
+              redirectPath = '/';
+          }
           router.push(redirectPath);
         } catch (error) {
           console.error("Erro ao atualizar último login:", error);
