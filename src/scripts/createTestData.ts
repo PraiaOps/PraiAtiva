@@ -1,4 +1,4 @@
-import { db } from './firebaseAdmin';
+import { db } from '@/config/firebase'; // Alterado para usar a instância principal do app
 import { 
   collection,
   doc,
