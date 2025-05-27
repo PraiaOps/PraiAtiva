@@ -189,7 +189,6 @@ export default function DashboardLayout({
                 if (pathname.includes('alunos')) return 'Meus Alunos';
                 if (pathname.includes('nova-atividade')) return 'Nova Atividade';
                 if (pathname.includes('admin')) return 'Painel Administrativo';
-                return 'Atividades Disponíveis';
               })()}
             </h1>
           </div>

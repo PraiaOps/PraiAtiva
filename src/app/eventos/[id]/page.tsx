@@ -70,7 +70,7 @@ const eventosData: Evento[] = [
     titulo: 'VAARIO 2025 - Campeonato Mundial de Canoa Havaiana',
     descricao: 'Pela primeira vez no Brasil, Niterói sedia o campeonato mundial de canoa havaiana (Va\\\'a) reunindo atletas de diversos países',
     descricaoCompleta: 'Niterói será palco de um evento histórico para o esporte brasileiro. Pela primeira vez, o Brasil recebe o Campeonato Mundial de Va\\\'a (Canoa Havaiana), reunindo atletas de 30 países. A competição acontecerá em Niterói, a apenas 25km do Aeroporto Internacional do Rio de Janeiro. O evento terá início com a familiarização dos atletas com o local nos dias 13 a 15 de agosto, seguido pela cerimônia de abertura no dia 15. As competições ocorrerão entre os dias 16 e 21 de agosto, com diversos dias de provas e um dia reserva caso seja necessário.',
-    imagem: '/images/eventos/vaario2025.webp',
+    imagem: '/images/canoa-havaiana.jpg',
     data: '13 a 21 de Agosto, 2025',
     horario: 'Diversos horários conforme programação',
     local: 'Niterói, RJ (a 25km do Aeroporto Internacional do Rio de Janeiro)',
@@ -81,9 +81,9 @@ const eventosData: Evento[] = [
     preco: 'Gratuito para espectadores',
     vagas: 2000,
     inscritos: 850,
-    imagemPrincipal: '/images/eventos/vaario2025.webp',
+    imagemPrincipal: '/images/canoa-havaiana.jpg',
     imagens: [
-      '/images/eventos/vaario2025.webp',
+      '/images/canoa-havaiana.jpg',
       '/images/atividade_mar.jpg',
       '/images/areia_calcadao.jpg'
     ],
@@ -101,7 +101,7 @@ const eventosData: Evento[] = [
     titulo: 'Torneio de Beach Tennis',
     descricao: 'Participe do maior torneio de beach tennis do litoral fluminense, com categorias para todos os níveis',
     descricaoCompleta: 'O Torneio de Beach Tennis do Rio é uma competição que reúne atletas amadores e profissionais em um fim de semana de muita diversão e esporte na areia. Com categorias para todos os níveis, desde iniciantes até avançados, o torneio é uma oportunidade perfeita para praticar esse esporte que vem crescendo rapidamente no Brasil. Além das competições, haverá clínicas gratuitas para quem quer conhecer o esporte, área de alimentação e música ao vivo para criar um ambiente festivo e agradável.',
-    imagem: 'https://via.placeholder.com/1200x600/F59E0B/FFFFFF?text=Beach+Tennis',
+    imagem: '/images/beach-activities.jpg',
     data: '10 a 12 de Fevereiro',
     horario: '9h às 18h',
     local: 'Praia de Copacabana, Rio de Janeiro',
@@ -112,11 +112,11 @@ const eventosData: Evento[] = [
     preco: 'R$ 120 por pessoa (competidores)',
     vagas: 150,
     inscritos: 87,
-    imagemPrincipal: '/images/placeholder-beach-tennis.jpg',
+    imagemPrincipal: '/images/beach-activities.jpg',
     imagens: [
-      '/images/placeholder-beach-tennis.jpg',
       '/images/beach-activities.jpg',
-      '/images/beach-hero-sunset.jpg'
+      '/images/beach-hero-sunset.jpg',
+      '/images/areia_calcadao.jpg'
     ],
     detalheCompleto: `<p>O Torneio de Beach Tennis de Copacabana é um dos maiores eventos deste esporte no Brasil, reunindo atletas profissionais e amadores de várias categorias.</p>
     <p>Com estrutura profissional montada diretamente na areia, o torneio oferece uma experiência única tanto para competidores quanto para espectadores.</p>
@@ -132,7 +132,7 @@ const eventosData: Evento[] = [
     titulo: 'Aula aberta de Yoga na Praia',
     descricao: 'Aula de yoga gratuita para todas as idades e níveis, com instrutores qualificados e ambiente tranquilo',
     descricaoCompleta: 'Comece sua manhã de forma revigorante com uma aula de yoga ao nascer do sol na Praia do Recreio. Conduzida por instrutores experientes, a aula é aberta para todos os níveis, desde iniciantes até praticantes avançados. Traga seu tapete, uma toalha e água, e desfrute de uma experiência única de conexão com a natureza enquanto pratica posturas que fortalecem o corpo e acalmam a mente. Após a aula, haverá um momento de meditação e respiração com o som das ondas ao fundo.',
-    imagem: 'https://via.placeholder.com/1200x600/10B981/FFFFFF?text=Yoga+na+Praia',
+    imagem: '/images/standup.jpg',
     data: '5 de Março',
     horario: '7h às 8h30',
     local: 'Praia do Recreio, Rio de Janeiro',
@@ -143,9 +143,9 @@ const eventosData: Evento[] = [
     preco: 'Gratuito',
     vagas: 80,
     inscritos: 45,
-    imagemPrincipal: '/images/placeholder-yoga.jpg',
+    imagemPrincipal: '/images/standup.jpg',
     imagens: [
-      '/images/placeholder-yoga.jpg',
+      '/images/standup.jpg',
       '/images/beach-hero-sunset.jpg',
       '/images/beach-activities.jpg'
     ],
@@ -163,7 +163,7 @@ const eventosData: Evento[] = [
     titulo: 'Sunset Beach Party',
     descricao: 'A melhor festa de pôr do sol da temporada, com DJs internacionais e ambiente descontraído',
     descricaoCompleta: 'A Sunset Beach Party é o evento mais aguardado do verão carioca. Com um line-up composto por DJs nacionais e internacionais, a festa acontece no melhor horário da praia: o pôr do sol. A partir das 16h, a música começa a tocar enquanto o sol se põe no horizonte, criando uma atmosfera mágica e única. Além da música de qualidade, o evento conta com serviço de bar com drinks especiais, área VIP e uma decoração que valoriza a beleza natural da praia de Ipanema.',
-    imagem: 'https://via.placeholder.com/1200x600/EC4899/FFFFFF?text=Sunset+Party',
+    imagem: '/images/surf.jpg',
     data: '22 de Fevereiro',
     horario: '16h às 23h',
     local: 'Praia de Ipanema, Rio de Janeiro',
@@ -174,9 +174,9 @@ const eventosData: Evento[] = [
     preco: 'R$ 80 (antecipado)',
     vagas: 500,
     inscritos: 320,
-    imagemPrincipal: '/images/beach-activities.jpg',
+    imagemPrincipal: '/images/surf.jpg',
     imagens: [
-      '/images/beach-activities.jpg',
+      '/images/surf.jpg',
       '/images/beach-hero-sunset.jpg',
       '/images/beach-hero-sunset.jpg'
     ],
@@ -186,7 +186,7 @@ const eventosData: Evento[] = [
     titulo: 'Workshop de Fotografia de Praia',
     descricao: 'Aprenda técnicas de fotografia de paisagens litorâneas e aproveite a prática em grupo',
     descricaoCompleta: 'Apaixonado por fotografia e pela beleza das praias? Este workshop é perfeito para você! Conduzido pelo renomado fotógrafo Gabriel Mendes, especialista em fotografia de paisagens naturais, o evento combina teoria e prática em um dos cenários mais bonitos do Rio de Janeiro: a Praia Vermelha. Os participantes aprenderão técnicas específicas para capturar o movimento das ondas, a luz dourada do final da tarde, a textura da areia e composições envolvendo elementos naturais e humanos na praia.',
-    imagem: 'https://via.placeholder.com/1200x600/8B5CF6/FFFFFF?text=Fotografia+Praia',
+    imagem: '/images/kitesurf.jpg',
     data: '15 de Março',
     horario: '16h às 19h',
     local: 'Praia Vermelha, Rio de Janeiro',
@@ -197,9 +197,9 @@ const eventosData: Evento[] = [
     preco: 'R$ 150',
     vagas: 20,
     inscritos: 12,
-    imagemPrincipal: '/images/atividade_mar.jpg',
+    imagemPrincipal: '/images/kitesurf.jpg',
     imagens: [
-      '/images/atividade_mar.jpg',
+      '/images/kitesurf.jpg',
       '/images/areia_calcadao.jpg',
       '/images/beach-hero-sunset.jpg'
     ],
@@ -293,7 +293,7 @@ export default function EventoDetalhes({ params }: { params: { id: string } }) {
         
         <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-12">
           <div className="container mx-auto">
-            <Link href="/eventos" className="inline-flex items-center text-white bg-black/30 backdrop-blur-sm px-4 py-2 rounded-full mb-4 hover:bg-black/50 transition-colors">
+            <Link href="/eventos" className="inline-flex items-center text-white bg-blue-600 px-4 py-2 rounded-full mb-4 hover:bg-blue-700 transition-colors">
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
               Voltar para eventos
             </Link>
@@ -307,15 +307,15 @@ export default function EventoDetalhes({ params }: { params: { id: string } }) {
             </h1>
             
             <div className="flex flex-wrap gap-4 items-center text-white mt-4">
-              <div className="flex items-center gap-1 bg-black/30 backdrop-blur-sm px-3 py-1 rounded-full">
+              <div className="flex items-center gap-1 bg-blue-700 px-3 py-1 rounded-full">
                 <CalendarIcon className="h-4 w-4" />
                 <span>{evento.data}</span>
               </div>
-              <div className="flex items-center gap-1 bg-black/30 backdrop-blur-sm px-3 py-1 rounded-full">
+              <div className="flex items-center gap-1 bg-blue-700 px-3 py-1 rounded-full">
                 <ClockIcon className="h-4 w-4" />
                 <span>{evento.horario}</span>
               </div>
-              <div className="flex items-center gap-1 bg-black/30 backdrop-blur-sm px-3 py-1 rounded-full">
+              <div className="flex items-center gap-1 bg-blue-700 px-3 py-1 rounded-full">
                 <MapPinIcon className="h-4 w-4" />
                 <span>{evento.local}</span>
               </div>
@@ -559,4 +559,4 @@ export default function EventoDetalhes({ params }: { params: { id: string } }) {
       )}
     </div>
   );
-} 
+}

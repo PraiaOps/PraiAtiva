@@ -15,6 +15,7 @@ import {
   ArrowRightIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import CapacityBar from '@/components/CapacityBar';
 
 // Tipos
 type Activity = {
@@ -62,61 +63,68 @@ const ActivityCard = ({
     month: '2-digit',
     year: 'numeric'
   });
-  
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="aspect-video relative bg-gray-300">
-        {/* Substituí a tag img por Image do Next.js para melhor otimização */}
-        <div className="relative w-full h-full">
-          <img 
-            src={activity.image} 
+    <div className="activity-card group bg-white rounded-xl shadow-md hover:shadow-lg transition-all border border-sky-100 overflow-hidden flex flex-col animate-fade-in">
+      <div className="relative h-44 sm:h-48 w-full overflow-hidden">
+        {activity.image ? (
+          <img
+            src={activity.image}
             alt={activity.name}
-            className="w-full h-full object-cover" 
+            className="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+            onError={e => {
+              // fallback dinâmico: se não encontrar a imagem, mostra uma imagem padrão de acordo com a categoria
+              const fallbackMap: Record<string, string> = {
+                'Surf': '/images/surf.jpg',
+                'SUP': '/images/standup.jpg',
+                'Bem-estar': '/images/standup.jpg',
+                'Beach Tennis': '/images/beach-tennis.jpg',
+                'Vôlei': '/images/volei-de-praia.jpg',
+                'Funcional': '/images/funcional.jpg',
+                'Yoga': '/images/standup.jpg',
+                'Kitesurf': '/images/kitesurf.jpg',
+                'Caiaque': '/images/caiaque.jpg',
+                'default': '/images/beach-activities.jpg'
+              };
+              const cat = activity.category || 'default';
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = fallbackMap[cat as keyof typeof fallbackMap] || fallbackMap['default'];
+            }}
           />
-        </div>
-        
-        {isEnrolled && (
-          <div className="absolute top-3 right-3 bg-green-500 text-white font-bold px-3 py-1.5 rounded-full flex items-center shadow-md">
-            <CheckCircleIcon className="h-5 w-5 mr-1.5" />
-            <span>Inscrito</span>
+        ) : (
+          <div className="h-full w-full bg-gray-200 flex items-center justify-center">
+            <span className="text-gray-500 text-xs">Imagem não disponível</span>
           </div>
         )}
-        
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 pt-12">
-          <h3 className="text-white font-bold text-lg sm:text-xl">{activity.name}</h3>
-          <p className="text-white/90 text-sm flex items-center">
-            <UserGroupIcon className="h-4 w-4 mr-1.5 inline" />
-            {activity.instructor}
-          </p>
+        <div className="absolute top-2 right-2 bg-white/90 text-sky-700 font-bold px-3 py-1 rounded-full text-xs shadow">
+          R$ {activity.price.toFixed(2)}
         </div>
       </div>
-      
-      <div className="p-4">
-        <div className="flex flex-wrap gap-y-2 mb-4">
-          <div className="flex items-center text-gray-700 text-sm w-1/2">
-            <CalendarIcon className="h-5 w-5 mr-1.5 text-blue-500 flex-shrink-0" />
-            <span>{formattedDate}</span>
-          </div>
-          <div className="flex items-center text-gray-700 text-sm w-1/2">
-            <ClockIcon className="h-5 w-5 mr-1.5 text-blue-500 flex-shrink-0" />
-            <span>{activity.time}</span>
-          </div>
-          <div className="flex items-center text-gray-700 text-sm">
-            <MapPinIcon className="h-5 w-5 mr-1.5 text-blue-500 flex-shrink-0" />
-            <span className="truncate">{activity.location}</span>
-          </div>
+      <div className="p-4 flex-1 flex flex-col">
+        <h3 className="text-base md:text-lg font-semibold mb-1 hover:text-primary-600 transition-colors truncate" title={activity.name}>
+          {activity.name}
+        </h3>
+        <div className="flex items-center text-gray-600 mb-2 gap-2">
+          <UserGroupIcon className="h-4 w-4 mr-1" />
+          <span className="text-xs md:text-sm truncate">{activity.instructor}</span>
         </div>
-        
-        <div className="flex justify-between items-center mb-4">
-          <div className="text-gray-900 font-bold text-lg">
-            R$ {activity.price.toFixed(2)}
-          </div>
-          <div className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
-            {activity.currentParticipants}/{activity.maxParticipants} vagas
-          </div>
+        <div className="flex items-center text-gray-600 mb-2 gap-2">
+          <MapPinIcon className="h-4 w-4 mr-1" />
+          <span className="text-xs md:text-sm truncate">{activity.location}</span>
         </div>
-        
-        <div>
+        <div className="flex items-center text-gray-600 mb-2 gap-2">
+          <CalendarIcon className="h-4 w-4 mr-1" />
+          <span className="text-xs md:text-sm truncate">{formattedDate}</span>
+        </div>
+        <div className="flex items-center text-gray-600 mb-2 gap-2">
+          <ClockIcon className="h-4 w-4 mr-1" />
+          <span className="text-xs md:text-sm truncate">{activity.time} ({activity.duration})</span>
+        </div>
+        <div className="mb-2">
+          <CapacityBar filled={activity.currentParticipants} total={activity.maxParticipants} className="ml-0 flex-shrink-0" />
+        </div>
+        <p className="text-gray-600 text-xs md:text-sm mb-2 md:mb-4 line-clamp-2">{activity.description}</p>
+        <div className="mt-auto">
           {isEnrolled ? (
             <button
               className="w-full min-h-[48px] flex items-center justify-center px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium"
@@ -272,7 +280,7 @@ const mockActivities: Activity[] = [
     currentParticipants: 5,
     description: 'Aula perfeita para quem quer começar no surf. Equipamentos inclusos.',
     category: 'Surf',
-    image: '/images/placeholder-surf.jpg'
+    image: '/images/surf.jpg'
   },
   {
     id: '2',
@@ -288,7 +296,7 @@ const mockActivities: Activity[] = [
     currentParticipants: 3,
     description: 'Aula para quem já tem experiência com SUP e quer aprimorar técnicas.',
     category: 'SUP',
-    image: '/images/placeholder-sup.jpg'
+    image: '/images/standup.jpg'
   },
   {
     id: '3',
@@ -515,88 +523,43 @@ export default function AlunoDashboard() {
         </div>
       );
     }
-    
+
     switch (activeTab) {
       case 'inscricoes':
-        return renderInscricoes();
+        return renderAtividadesInscritas();
       case 'perfil':
         return renderPerfil();
       default:
-        return renderAtividades();
+        return renderAtividadesInscritas();
     }
   };
 
-  // Renderizar aba Atividades Disponíveis
-  const renderAtividades = () => {
+  // Renderizar aba Atividades Inscritas (substitui "Atividades Disponíveis")
+  function renderAtividadesInscritas() {
     return (
       <div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {loading ? (
-            // Skeleton loading
-            Array(3).fill(0).map((_, index) => <ActivitySkeleton key={index} />)
-          ) : activities.length === 0 ? (
-            <div className="col-span-full bg-white p-6 rounded-lg shadow text-center">
-              <p className="text-gray-600">Não há atividades disponíveis no momento.</p>
-            </div>
-          ) : (
-            activities.map((activity) => (
-              <ActivityCard 
-                key={activity.id} 
-                activity={activity} 
-                isEnrolled={isEnrolled(activity.id)}
-                enrollingActivity={enrollingActivity}
-                onEnroll={handleEnroll}
-              />
-            ))
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Renderizar aba Minhas Inscrições
-  const renderInscricoes = () => {
-    return (
-      <div>
+        <h2 className="text-xl font-semibold mb-6">Atividades inscritas</h2>
         <div className="space-y-4">
           {loading ? (
-            // Skeleton loading
-            Array(2).fill(0).map((_, index) => (
-              <div key={index} className="bg-white rounded-lg shadow animate-pulse p-5 space-y-4">
-                <div className="flex justify-between">
-                  <div className="h-6 bg-gray-300 rounded w-1/2"></div>
-                  <div className="h-6 bg-gray-300 rounded-full w-1/4"></div>
-                </div>
-                <div className="space-y-2">
-                  <div className="h-4 bg-gray-300 rounded w-1/3"></div>
-                  <div className="h-4 bg-gray-300 rounded w-1/2"></div>
-                  <div className="h-4 bg-gray-300 rounded w-3/4"></div>
-                </div>
-                <div className="flex gap-2">
-                  <div className="h-10 bg-gray-300 rounded flex-1"></div>
-                  <div className="h-10 bg-gray-300 rounded flex-1"></div>
-                </div>
-              </div>
-            ))
+            Array(3).fill(0).map((_, i) => <ActivitySkeleton key={i} />)
           ) : enrollments.length === 0 ? (
             <div className="bg-white p-6 rounded-lg shadow text-center">
               <p className="text-gray-600">Você ainda não está inscrito em nenhuma atividade.</p>
               <button
                 className="mt-4 min-h-[48px] px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors"
-                onClick={() => router.push('/dashboard/aluno')}
+                onClick={() => router.push('/dashboard/aluno?tab=inscricoes')}
               >
-                Ver Atividades Disponíveis
+                Ver Atividades
               </button>
             </div>
           ) : (
             enrollments.map((enrollment) => {
-              const enrollmentActivity = activities.find(a => a.id === enrollment.activityId);
-              
+              const foundActivity = activities.find(a => a.id === enrollment.activityId);
               return (
-                <EnrollmentCard 
-                  key={enrollment.id} 
+                <EnrollmentCard
+                  key={enrollment.id}
                   enrollment={enrollment}
-                  activity={enrollmentActivity}
+                  activity={foundActivity}
                   onCancel={handleCancelEnrollment}
                   showDetails={showActivityDetails}
                 />
@@ -777,4 +740,4 @@ export default function AlunoDashboard() {
   };
 
   return renderContent();
-} 
+}
