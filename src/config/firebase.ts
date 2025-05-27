@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
@@ -14,8 +14,8 @@ const firebaseConfig = {
   measurementId: "G-Z8SLE3SKKJ"
 };
 
-// Inicializar o Firebase
-const app = initializeApp(firebaseConfig);
+// Inicializar o Firebase apenas se nenhuma instância existir
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Serviços do Firebase
 export const auth = getAuth(app);
