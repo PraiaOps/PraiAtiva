@@ -1,191 +1,297 @@
-import { loadStripe } from '@stripe/stripe-js';
+import { db } from '@/config/firebase';
 import { 
-  Transaction,
-  Enrollment
-} from '@/types';
-
-// Inicializar Stripe
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  addDoc,
+  updateDoc,
+  orderBy,
+  onSnapshot,
+  serverTimestamp,
+  limit,
+  startAfter
+} from 'firebase/firestore';
+import { Payment, PaymentStatus } from '@/types';
+import { notificationService } from './notificationService';
 
 class PaymentService {
+  private paymentsCollection = 'payments';
+
   /**
-   * Iniciar processo de pagamento
+   * Cria um novo pagamento
    */
-  async initiatePayment(enrollment: Enrollment) {
+  async createPayment(payment: Omit<Payment, 'id'>): Promise<string> {
     try {
-      const stripe = await stripePromise;
-      if (!stripe) throw new Error('Stripe not initialized');
-
-      // Criar sessão de pagamento com o Stripe
-      const response = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          enrollmentId: enrollment.id,
-          amount: enrollment.paymentInfo.amount,
-          studentEmail: enrollment.studentDetails.email,
-          activityName: enrollment.activityDetails.name,
-        }),
+      const paymentRef = await addDoc(collection(db, this.paymentsCollection), {
+        ...payment,
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
+        status: 'pending'
       });
 
-      const session = await response.json();
+      // Notificar o instrutor sobre o novo pagamento
+      await notificationService.createPaymentNotification(
+        payment.instructorId,
+        payment.studentName,
+        payment.activityName,
+        payment.amount,
+        paymentRef.id
+      );
 
-      // Redirecionar para página de checkout do Stripe
-      const result = await stripe.redirectToCheckout({
-        sessionId: session.id,
-      });
-
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
+      return paymentRef.id;
     } catch (error) {
-      console.error('Erro ao iniciar pagamento:', error);
+      console.error('Erro ao criar pagamento:', error);
       throw error;
     }
   }
 
   /**
-   * Processar pagamento bem-sucedido
+   * Atualiza um pagamento
    */
-  async processSuccessfulPayment(sessionId: string): Promise<void> {
+  async updatePayment(id: string, payment: Partial<Payment>): Promise<void> {
     try {
-      const response = await fetch('/api/process-payment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sessionId,
-        }),
+      const paymentRef = doc(db, this.paymentsCollection, id);
+      await updateDoc(paymentRef, {
+        ...payment,
+        updated: serverTimestamp()
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to process payment');
-      }
     } catch (error) {
-      console.error('Erro ao processar pagamento:', error);
+      console.error('Erro ao atualizar pagamento:', error);
       throw error;
     }
   }
 
   /**
-   * Iniciar processo de reembolso
+   * Busca um pagamento pelo ID
    */
-  async initiateRefund(
-    enrollmentId: string,
-    reason: string
-  ): Promise<void> {
+  async getPayment(id: string): Promise<Payment | null> {
     try {
-      const response = await fetch('/api/create-refund', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          enrollmentId,
-          reason,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to initiate refund');
-      }
-    } catch (error) {
-      console.error('Erro ao iniciar reembolso:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Obter histórico de transações
-   */
-  async getTransactionHistory(
-    userId: string,
-    userType: 'student' | 'instructor',
-    filters?: {
-      startDate?: Date;
-      endDate?: Date;
-      status?: Transaction['status'];
-    }
-  ): Promise<Transaction[]> {
-    try {
-      const queryParams = new URLSearchParams({
-        userId,
-        userType,
-        ...(filters?.startDate && { startDate: filters.startDate.toISOString() }),
-        ...(filters?.endDate && { endDate: filters.endDate.toISOString() }),
-        ...(filters?.status && { status: filters.status }),
-      });
-
-      const response = await fetch(`/api/transactions?${queryParams}`);
+      const paymentRef = doc(db, this.paymentsCollection, id);
+      const paymentDoc = await getDoc(paymentRef);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch transaction history');
+      if (paymentDoc.exists()) {
+        return {
+          id: paymentDoc.id,
+          ...paymentDoc.data()
+        } as Payment;
       }
-
-      return response.json();
-    } catch (error) {
-      console.error('Erro ao buscar histórico de transações:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Simula pagamento via PIX para o fluxo de teste
-   */
-  async simulatePixPayment(enrollment: Enrollment): Promise<void> {
-    try {
-      // Simula um delay de processamento do PIX
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Atualiza o status da matrícula após "pagamento"
-      await fetch('/api/confirm-enrollment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          enrollmentId: enrollment.id,
-          paymentMethod: 'pix',
-          amount: enrollment.paymentInfo.amount
-        }),
-      });
-    } catch (error) {
-      console.error('Erro ao processar pagamento PIX:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Obter histórico de transações do instrutor
-   */
-  async getInstructorTransactions(
-    instructorId: string,
-    filters?: {
-      startDate?: Date;
-      endDate?: Date;
-      status?: Transaction['status'];
-    }
-  ): Promise<Transaction[]> {
-    try {
-      const queryParams = new URLSearchParams({
-        instructorId,
-        ...(filters?.startDate && { startDate: filters.startDate.toISOString() }),
-        ...(filters?.endDate && { endDate: filters.endDate.toISOString() }),
-        ...(filters?.status && { status: filters.status })
-      });
-
-      const response = await fetch(`/api/instructor/transactions?${queryParams}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch transactions');
-      }
-
-      return response.json();
+      return null;
     } catch (error) {
-      console.error('Erro ao buscar transações:', error);
+      console.error('Erro ao buscar pagamento:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Lista pagamentos com filtros
+   */
+  async listPayments(filters?: {
+    studentId?: string;
+    instructorId?: string;
+    activityId?: string;
+    enrollmentId?: string;
+    status?: PaymentStatus;
+  }): Promise<Payment[]> {
+    try {
+      let q = collection(db, this.paymentsCollection);
+      
+      if (filters) {
+        const constraints = [];
+        
+        if (filters.studentId) {
+          constraints.push(where('studentId', '==', filters.studentId));
+        }
+        
+        if (filters.instructorId) {
+          constraints.push(where('instructorId', '==', filters.instructorId));
+        }
+        
+        if (filters.activityId) {
+          constraints.push(where('activityId', '==', filters.activityId));
+        }
+        
+        if (filters.enrollmentId) {
+          constraints.push(where('enrollmentId', '==', filters.enrollmentId));
+        }
+        
+        if (filters.status) {
+          constraints.push(where('status', '==', filters.status));
+        }
+        
+        q = query(q, ...constraints, orderBy('created', 'desc'));
+      } else {
+        q = query(q, orderBy('created', 'desc'));
+      }
+      
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Payment[];
+    } catch (error) {
+      console.error('Erro ao listar pagamentos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Escuta pagamentos em tempo real
+   */
+  subscribeToPayments(callback: (payments: Payment[]) => void, filters?: {
+    studentId?: string;
+    instructorId?: string;
+    activityId?: string;
+    enrollmentId?: string;
+    status?: PaymentStatus;
+  }) {
+    let q = collection(db, this.paymentsCollection);
+    
+    if (filters) {
+      const constraints = [];
+      
+      if (filters.studentId) {
+        constraints.push(where('studentId', '==', filters.studentId));
+      }
+      
+      if (filters.instructorId) {
+        constraints.push(where('instructorId', '==', filters.instructorId));
+      }
+      
+      if (filters.activityId) {
+        constraints.push(where('activityId', '==', filters.activityId));
+      }
+      
+      if (filters.enrollmentId) {
+        constraints.push(where('enrollmentId', '==', filters.enrollmentId));
+      }
+      
+      if (filters.status) {
+        constraints.push(where('status', '==', filters.status));
+      }
+      
+      q = query(q, ...constraints, orderBy('created', 'desc'));
+    } else {
+      q = query(q, orderBy('created', 'desc'));
+    }
+
+    return onSnapshot(q, (snapshot) => {
+      const payments = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Payment[];
+      
+      callback(payments);
+    });
+  }
+
+  /**
+   * Busca pagamentos de um aluno
+   */
+  async getStudentPayments(studentId: string): Promise<Payment[]> {
+    try {
+      const q = query(
+        collection(db, this.paymentsCollection),
+        where('studentId', '==', studentId),
+        orderBy('created', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Payment[];
+    } catch (error) {
+      console.error('Erro ao buscar pagamentos do aluno:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca pagamentos de um instrutor
+   */
+  async getInstructorPayments(instructorId: string): Promise<Payment[]> {
+    try {
+      const q = query(
+        collection(db, this.paymentsCollection),
+        where('instructorId', '==', instructorId),
+        orderBy('created', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Payment[];
+    } catch (error) {
+      console.error('Erro ao buscar pagamentos do instrutor:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca pagamentos de uma atividade
+   */
+  async getActivityPayments(activityId: string): Promise<Payment[]> {
+    try {
+      const q = query(
+        collection(db, this.paymentsCollection),
+        where('activityId', '==', activityId),
+        orderBy('created', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Payment[];
+    } catch (error) {
+      console.error('Erro ao buscar pagamentos da atividade:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Atualiza status do pagamento
+   */
+  async updatePaymentStatus(id: string, status: PaymentStatus): Promise<void> {
+    try {
+      const paymentRef = doc(db, this.paymentsCollection, id);
+      await updateDoc(paymentRef, {
+        status,
+        updated: serverTimestamp()
+      });
+
+      // Notificar o aluno sobre a mudança de status
+      const payment = await this.getPayment(id);
+      if (payment) {
+        await notificationService.createPaymentStatusNotification(
+          payment.studentId,
+          payment.instructorName,
+          payment.activityName,
+          payment.amount,
+          status,
+          id
+        );
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status do pagamento:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Deleta um pagamento
+   */
+  async deletePayment(id: string): Promise<void> {
+    try {
+      const paymentRef = doc(db, this.paymentsCollection, id);
+      await paymentRef.delete();
+    } catch (error) {
+      console.error('Erro ao deletar pagamento:', error);
       throw error;
     }
   }

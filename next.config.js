@@ -52,6 +52,12 @@ const nextConfig = {
         hostname: 'randomuser.me',
       },
     ],
+    domains: ['firebasestorage.googleapis.com'],
+  },
+  env: {
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
+    NEXT_PUBLIC_APP_DESCRIPTION: process.env.NEXT_PUBLIC_APP_DESCRIPTION,
   },
 }
 

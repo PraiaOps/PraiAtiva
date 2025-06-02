@@ -7,7 +7,8 @@ import {
   ArrowTrendingUpIcon,
   ClockIcon,
   BanknotesIcon,
-  CalendarIcon
+  CalendarIcon,
+  CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
 
 interface FinancialSummaryCardProps {
@@ -31,7 +32,10 @@ export const FinancialSummaryCard = ({ summary }: FinancialSummaryCardProps) => 
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       {/* Header Section */}
       <div className="p-6 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900">Resumo Financeiro</h2>
+        <div className="flex items-center mb-4">
+          <CurrencyDollarIcon className="h-8 w-8 text-orange-500" />
+          <h2 className="text-xl font-bold text-gray-900 ml-2">Resumo Financeiro</h2>
+        </div>
       </div>
 
       {/* Main Stats */}

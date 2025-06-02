@@ -1,5 +1,5 @@
 import { db } from '@/config/firebase';
-import { 
+import {
   collection,
   doc,
   getDoc,
@@ -11,9 +11,12 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  deleteDoc,
+  limit,
+  startAfter
 } from 'firebase/firestore';
-import { 
+import {
   Enrollment,
   EnrollmentStatus,
   Activity,
@@ -21,120 +24,191 @@ import {
   Transaction,
   InstructorFinancialSummary
 } from '@/types';
+import { notificationService } from './notificationService';
+import { activityService } from './activityService';
+import { stripeService } from './stripeService';
 
 class EnrollmentService {
   private enrollmentsCollection = 'enrollments';
   private transactionsCollection = 'transactions';
 
   /**
-   * Cria uma nova matrícula para o fluxo de teste
+   * Cria uma nova inscrição
    */
-  async createEnrollment(
-    studentData: User,
-    activityData: Activity,
-    instructorId: string
-  ): Promise<string> {
+  async createEnrollment(enrollment: Omit<Enrollment, 'id'>): Promise<string> {
     try {
-      const now = new Date();
-      const amount = 50.00; // Valor fixo para teste
-      const commission = amount * 0.15; // 15% de comissão
-      const instructorAmount = amount - commission;
+      const enrollmentRef = await addDoc(collection(db, this.enrollmentsCollection), {
+        ...enrollment,
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
+        status: 'pending'
+      });
 
-      const enrollmentData: Omit<Enrollment, 'id'> = {
-        studentId: studentData.id,
-        instructorId: instructorId,
-        activityId: activityData.id,
-        created: now,
-        updated: now,
-        status: 'pending',
-        paymentInfo: {
-          amount,
-          commission,
-          instructorAmount,
-          paymentMethod: 'pix',
-          paymentStatus: 'pending',
-          paymentDate: now
-        },
-        attendance: [],
-        studentDetails: {
-          name: studentData.name,
-          email: studentData.email,
-          phone: studentData.phone,
-          photo: studentData.photoURL
-        },
-        activityDetails: {
-          name: activityData.name,
-          type: activityData.type,
-          location: activityData.location.meetingPoint,
-          schedule: {
-            date: now,
-            startTime: '09:00',
-            endTime: '10:00'
-          }
-        }
-      };
-
-      const enrollmentRef = await addDoc(
-        collection(db, this.enrollmentsCollection), 
-        {
-          ...enrollmentData,
-          created: serverTimestamp(),
-          updated: serverTimestamp()
-        }
+      // Notificar o instrutor sobre a nova inscrição
+      await notificationService.createEnrollmentNotification(
+        enrollment.instructorId,
+        enrollment.studentName,
+        enrollment.activityName,
+        enrollmentRef.id
       );
+
+      // Criar sessão de pagamento no Stripe apenas se não for PIX
+      if (enrollment.paymentInfo.paymentMethod !== 'pix') {
+        const sessionId = await stripeService.createPaymentSession({
+          id: enrollmentRef.id,
+          studentId: enrollment.studentId,
+          instructorId: enrollment.instructorId,
+          activityId: enrollment.activityId,
+          enrollmentId: enrollmentRef.id,
+          studentName: enrollment.studentName,
+          instructorName: enrollment.instructorName,
+          activityName: enrollment.activityName,
+          amount: enrollment.paymentInfo.amount,
+          status: 'pending',
+          created: new Date(),
+          updated: new Date()
+        });
+      }
 
       return enrollmentRef.id;
     } catch (error) {
-      console.error('Erro ao criar matrícula:', error);
+      console.error('Erro ao criar inscrição:', error);
       throw error;
     }
   }
 
   /**
-   * Atualiza o status de uma matrícula
+   * Atualiza uma inscrição
    */
-  async updateEnrollmentStatus(
-    enrollmentId: string, 
-    status: EnrollmentStatus,
-    paymentStatus: 'pending' | 'paid' | 'refunded' = 'pending'
-  ): Promise<void> {
+  async updateEnrollment(id: string, enrollment: Partial<Enrollment>): Promise<void> {
     try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, enrollmentId);
+      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
       await updateDoc(enrollmentRef, {
-        status,
-        'paymentInfo.paymentStatus': paymentStatus,
+        ...enrollment,
         updated: serverTimestamp()
       });
     } catch (error) {
-      console.error('Erro ao atualizar status da matrícula:', error);
+      console.error('Erro ao atualizar inscrição:', error);
       throw error;
     }
   }
 
   /**
-   * Busca uma matrícula específica
+   * Busca uma inscrição pelo ID
    */
-  async getEnrollment(enrollmentId: string): Promise<Enrollment | null> {
+  async getEnrollment(id: string): Promise<Enrollment | null> {
     try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, enrollmentId);
-      const enrollmentSnap = await getDoc(enrollmentRef);
+      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
+      const enrollmentDoc = await getDoc(enrollmentRef);
 
-      if (!enrollmentSnap.exists()) {
-        return null;
+      if (enrollmentDoc.exists()) {
+        return {
+          id: enrollmentDoc.id,
+          ...enrollmentDoc.data()
+        } as Enrollment;
       }
 
-      return {
-        id: enrollmentSnap.id,
-        ...enrollmentSnap.data()
-      } as Enrollment;
+      return null;
     } catch (error) {
-      console.error('Erro ao buscar matrícula:', error);
+      console.error('Erro ao buscar inscrição:', error);
       throw error;
     }
   }
 
   /**
-   * Lista todas as matrículas de um aluno
+   * Lista inscrições com filtros
+   */
+  async listEnrollments(filters?: {
+    studentId?: string;
+    instructorId?: string;
+    activityId?: string;
+    status?: EnrollmentStatus;
+  }): Promise<Enrollment[]> {
+    try {
+      let q = collection(db, this.enrollmentsCollection);
+
+      if (filters) {
+        const constraints = [];
+
+        if (filters.studentId) {
+          constraints.push(where('studentId', '==', filters.studentId));
+        }
+
+        if (filters.instructorId) {
+          constraints.push(where('instructorId', '==', filters.instructorId));
+        }
+
+        if (filters.activityId) {
+          constraints.push(where('activityId', '==', filters.activityId));
+        }
+
+        if (filters.status) {
+          constraints.push(where('status', '==', filters.status));
+        }
+
+        q = query(q, ...constraints, orderBy('created', 'desc'));
+      } else {
+        q = query(q, orderBy('created', 'desc'));
+      }
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Enrollment[];
+    } catch (error) {
+      console.error('Erro ao listar inscrições:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Escuta inscrições em tempo real
+   */
+  subscribeToEnrollments(callback: (enrollments: Enrollment[]) => void, filters?: {
+    studentId?: string;
+    instructorId?: string;
+    activityId?: string;
+    status?: EnrollmentStatus;
+  }) {
+    let q = collection(db, this.enrollmentsCollection);
+
+    if (filters) {
+      const constraints = [];
+
+      if (filters.studentId) {
+        constraints.push(where('studentId', '==', filters.studentId));
+      }
+
+      if (filters.instructorId) {
+        constraints.push(where('instructorId', '==', filters.instructorId));
+      }
+
+      if (filters.activityId) {
+        constraints.push(where('activityId', '==', filters.activityId));
+      }
+
+      if (filters.status) {
+        constraints.push(where('status', '==', filters.status));
+      }
+
+      q = query(q, ...constraints, orderBy('created', 'desc'));
+    } else {
+      q = query(q, orderBy('created', 'desc'));
+    }
+
+    return onSnapshot(q, (snapshot) => {
+      const enrollments = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Enrollment[];
+
+      callback(enrollments);
+    });
+  }
+
+  /**
+   * Busca inscrições de um aluno
    */
   async getStudentEnrollments(studentId: string): Promise<Enrollment[]> {
     try {
@@ -144,19 +218,19 @@ class EnrollmentService {
         orderBy('created', 'desc')
       );
 
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Enrollment[];
     } catch (error) {
-      console.error('Erro ao buscar matrículas do aluno:', error);
+      console.error('Erro ao buscar inscrições do aluno:', error);
       throw error;
     }
   }
 
   /**
-   * Lista todas as matrículas de um instrutor
+   * Busca inscrições de um instrutor
    */
   async getInstructorEnrollments(instructorId: string): Promise<Enrollment[]> {
     try {
@@ -166,13 +240,76 @@ class EnrollmentService {
         orderBy('created', 'desc')
       );
 
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Enrollment[];
     } catch (error) {
-      console.error('Erro ao buscar matrículas do instrutor:', error);
+      console.error('Erro ao buscar inscrições do instrutor:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca inscrições de uma atividade
+   */
+  async getActivityEnrollments(activityId: string): Promise<Enrollment[]> {
+    try {
+      const q = query(
+        collection(db, this.enrollmentsCollection),
+        where('activityId', '==', activityId),
+        orderBy('created', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Enrollment[];
+    } catch (error) {
+      console.error('Erro ao buscar inscrições da atividade:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Atualiza status da inscrição
+   */
+  async updateEnrollmentStatus(id: string, status: EnrollmentStatus): Promise<void> {
+    try {
+      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
+      await updateDoc(enrollmentRef, {
+        status,
+        updated: serverTimestamp()
+      });
+
+      // Notificar o aluno sobre a mudança de status
+      const enrollment = await this.getEnrollment(id);
+      if (enrollment) {
+        await notificationService.createStatusNotification(
+          enrollment.studentId,
+          enrollment.instructorName,
+          enrollment.activityName,
+          status,
+          id
+        );
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status da inscrição:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Deleta uma inscrição
+   */
+  async deleteEnrollment(id: string): Promise<void> {
+    try {
+      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
+      await enrollmentRef.delete();
+    } catch (error) {
+      console.error('Erro ao deletar inscrição:', error);
       throw error;
     }
   }
@@ -198,7 +335,7 @@ class EnrollmentService {
    * Atualiza informações de presença
    */
   async updateAttendance(
-    enrollmentId: string, 
+    enrollmentId: string,
     attendance: { present: boolean; date: Date | string; notes?: string }
   ): Promise<void> {
     try {
@@ -210,7 +347,7 @@ class EnrollmentService {
       }
 
       const currentAttendance = enrollmentSnap.data().attendance || [];
-      
+
       await updateDoc(enrollmentRef, {
         attendance: [...currentAttendance, attendance],
         updated: serverTimestamp()
@@ -295,7 +432,7 @@ class EnrollmentService {
 
       // Calcular ganhos totais e por período
       const periodMap = new Map<string, { amount: number; enrollments: number }>();
-      
+
       paidSnapshot.forEach(doc => {
         const enrollment = doc.data() as Enrollment;
         summary.totalEarnings += enrollment.paymentInfo.instructorAmount;
@@ -303,7 +440,7 @@ class EnrollmentService {
         // Agrupar por mês
         const date = new Date(enrollment.paymentInfo.paymentDate);
         const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        
+
         const periodData = periodMap.get(period) || { amount: 0, enrollments: 0 };
         periodData.amount += enrollment.paymentInfo.instructorAmount;
         periodData.enrollments += 1;
@@ -339,6 +476,156 @@ class EnrollmentService {
       return summary;
     } catch (error) {
       console.error('Erro ao calcular resumo financeiro:', error);
+      throw error;
+    }
+  }
+
+  // Atualizar uma matrícula
+  async updateEnrollment(id: string, enrollment: Partial<Enrollment>) {
+    try {
+      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
+      const enrollmentDoc = await getDoc(enrollmentRef);
+
+      if (enrollmentDoc.exists()) {
+        const currentEnrollment = enrollmentDoc.data() as Enrollment;
+
+        // Se o status mudou para cancelado, atualizar contagem de alunos
+        if (enrollment.status === 'cancelled' && currentEnrollment.status !== 'cancelled') {
+          await activityService.updateEnrolledStudents(currentEnrollment.activityId, -1);
+        }
+
+        // Atualizar a matrícula
+        await updateDoc(enrollmentRef, {
+          ...enrollment,
+          updated: serverTimestamp()
+        });
+
+        // Notificar o instrutor sobre a atualização
+        if (enrollment.status) {
+          await notificationService.createEnrollmentNotification(
+            currentEnrollment.instructorId,
+            currentEnrollment.studentName,
+            currentEnrollment.activityName,
+            id
+          );
+        }
+
+        // Criar notificação para o aluno sobre a mudança de status
+        if (enrollment.status && enrollment.status !== currentEnrollment.status) {
+          await notificationService.createEnrollmentStatusNotification(
+            currentEnrollment.studentId,
+            currentEnrollment.activityName,
+            enrollment.status,
+            id
+          );
+        }
+
+        // Criar notificação para o aluno sobre a mudança de status de pagamento
+        if (enrollment.paymentInfo?.paymentStatus &&
+            enrollment.paymentInfo.paymentStatus !== currentEnrollment.paymentInfo.paymentStatus) {
+          await notificationService.createPaymentNotification(
+            currentEnrollment.studentId,
+            currentEnrollment.paymentInfo.amount,
+            enrollment.paymentInfo.paymentStatus,
+            id
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar matrícula:', error);
+      throw error;
+    }
+  }
+
+  // Excluir uma matrícula
+  async deleteEnrollment(id: string) {
+    try {
+      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
+      const enrollmentDoc = await getDoc(enrollmentRef);
+
+      if (enrollmentDoc.exists()) {
+        const enrollment = enrollmentDoc.data() as Enrollment;
+
+        // Atualizar contagem de alunos na atividade
+        if (enrollment.status !== 'cancelled') {
+          await activityService.updateEnrolledStudents(enrollment.activityId, -1);
+        }
+
+        await deleteDoc(enrollmentRef);
+      }
+    } catch (error) {
+      console.error('Erro ao excluir matrícula:', error);
+      throw error;
+    }
+  }
+
+  // Listar matrículas
+  async listEnrollments(filters?: {
+    activityId?: string;
+    studentId?: string;
+    instructorId?: string;
+    status?: Enrollment['status'];
+  }) {
+    try {
+      let q = collection(db, this.enrollmentsCollection);
+
+      if (filters) {
+        const constraints = [];
+
+        if (filters.activityId) {
+          constraints.push(where('activityId', '==', filters.activityId));
+        }
+
+        if (filters.studentId) {
+          constraints.push(where('studentId', '==', filters.studentId));
+        }
+
+        if (filters.instructorId) {
+          constraints.push(where('instructorId', '==', filters.instructorId));
+        }
+
+        if (filters.status) {
+          constraints.push(where('status', '==', filters.status));
+        }
+
+        q = query(q, ...constraints, orderBy('created', 'desc'));
+      } else {
+        q = query(q, orderBy('created', 'desc'));
+      }
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        created: doc.data().created.toDate(),
+        updated: doc.data().updated.toDate(),
+        paymentDate: doc.data().paymentInfo?.paymentDate?.toDate()
+      })) as Enrollment[];
+    } catch (error) {
+      console.error('Erro ao listar matrículas:', error);
+      throw error;
+    }
+  }
+
+  // Atualizar status de pagamento
+  async updatePaymentStatus(id: string, paymentStatus: Enrollment['paymentStatus']) {
+    try {
+      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
+      await updateDoc(enrollmentRef, {
+        paymentStatus,
+        paymentDate: paymentStatus === 'paid' ? Timestamp.now() : null,
+        updated: Timestamp.now()
+      });
+
+      // Criar notificação para o aluno sobre a mudança de status de pagamento
+      await notificationService.createPaymentNotification(
+        enrollmentRef.data().studentId,
+        enrollmentRef.data().paymentInfo.amount,
+        paymentStatus,
+        id
+      );
+    } catch (error) {
+      console.error('Erro ao atualizar status de pagamento:', error);
       throw error;
     }
   }

@@ -59,7 +59,7 @@ export default function DashboardLayout({
     instrutor: [
       { href: '/dashboard/instrutor', label: 'Atividades', icon: <HomeIcon className="w-6 h-6 lg:w-5 lg:h-5 lg:mr-2" /> },
       { href: '/dashboard/instrutor?tab=alunos', label: 'Alunos', icon: <UsersIcon className="w-6 h-6 lg:w-5 lg:h-5 lg:mr-2" /> },
-      { href: '/dashboard/instrutor?tab=nova-atividade', label: 'Adicionar', icon: <PlusCircleIcon className="w-6 h-6 lg:w-5 lg:h-5 lg:mr-2" /> },
+      { href: '/dashboard/instrutor/nova-atividade', label: 'Nova Atividade', icon: <PlusCircleIcon className="w-6 h-6 lg:w-5 lg:h-5 lg:mr-2" /> },
       { href: '/dashboard/instrutor?tab=perfil', label: 'Perfil', icon: <UserIcon className="w-6 h-6 lg:w-5 lg:h-5 lg:mr-2" /> },
     ],
     aluno: [
@@ -76,7 +76,7 @@ export default function DashboardLayout({
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
       </div>
     );
   }
@@ -104,12 +104,14 @@ export default function DashboardLayout({
         w-[250px] transition-transform duration-300 ease-in-out
         lg:relative lg:translate-x-0 lg:w-56 lg:min-h-[calc(100vh-64px)]
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${userType === 'admin' ? 'bg-gray-800' : userType === 'instrutor' ? 'bg-amber-700' : 'bg-blue-700'}
+        ${userType === 'admin' ? 'bg-gray-800' : userType === 'instrutor' ? 'bg-orange-600' : 'bg-orange-700'}
         text-white
       `}>
         <div className="p-3 flex justify-between items-center border-b border-white/10">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+            <div className={`w-8 h-8 rounded-full ${
+              userType === 'instrutor' ? 'bg-orange-500' : 'bg-blue-500'
+            } flex items-center justify-center`}>
               <UserIcon className="w-5 h-5" />
             </div>
             <div>
@@ -131,7 +133,8 @@ export default function DashboardLayout({
           <nav className="space-y-0.5">
             {links.map((link) => {
               const isActive = pathname === link.href || 
-                pathname.includes(link.href) && link.href.includes('?tab=');
+                (pathname.includes(link.href.split('?')[0]) && 
+                 (!link.href.includes('?') || pathname.includes(link.href.split('?')[1])));
               
               return (
                 <Link
@@ -168,7 +171,9 @@ export default function DashboardLayout({
         {/* Botão para abrir o menu lateral em dispositivos móveis */}
         <div className="lg:hidden flex items-center px-3 py-3">
           <button
-            className="p-2 rounded-md bg-blue-600 text-white flex items-center justify-center"
+            className={`p-2 rounded-md ${
+              userType === 'instrutor' ? 'bg-orange-600' : 'bg-orange-600'
+            } text-white flex items-center justify-center`}
             onClick={() => setSidebarOpen(true)}
             aria-label="Abrir menu"
           >
@@ -182,13 +187,18 @@ export default function DashboardLayout({
         {/* Conteúdo da página - com título da seção agora dentro */}
         <div className="p-3 md:p-5">
           <div className="mb-4 lg:hidden">
-            <h1 className="text-lg font-semibold text-blue-800">
+            <h1 className={`text-lg font-semibold ${
+              userType === 'instrutor' ? 'text-orange-800' : 'text-blue-800'
+            }`}>
               {(() => {
                 if (pathname.includes('inscricoes')) return 'Minhas Inscrições';
                 if (pathname.includes('perfil')) return 'Meu Perfil';
                 if (pathname.includes('alunos')) return 'Meus Alunos';
                 if (pathname.includes('nova-atividade')) return 'Nova Atividade';
                 if (pathname.includes('admin')) return 'Painel Administrativo';
+                if (pathname.includes('instrutor')) return 'Painel do Instrutor';
+                if (pathname.includes('aluno')) return 'Painel do Aluno';
+                return 'Dashboard';
               })()}
             </h1>
           </div>

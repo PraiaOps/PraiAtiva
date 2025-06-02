@@ -1,14 +1,18 @@
 // Tipos de Usuários
+export type UserRole = 'student' | 'instructor' | 'admin';
+
 export interface User {
   id: string;
   uid: string;
-  name: string;
   email: string;
+  name: string;
+  role: UserRole;
   phone?: string;
   photoURL?: string;
-  role: 'practitioner' | 'entrepreneur' | 'admin' | 'student' | 'instructor';
-  createdAt: Date | string;
-  updatedAt: Date | string;
+  bio?: string;
+  location?: string;
+  created: Date;
+  updated: Date;
 }
 
 // Tipo para Praticante (usuário que busca atividades)
@@ -67,50 +71,37 @@ export interface Beach {
 }
 
 // Tipo para Atividade
+export type ActivityStatus = 'active' | 'inactive' | 'cancelled';
+
 export interface Activity {
   id: string;
+  instructorId: string;
+  instructorName: string;
   name: string;
-  type: ActivityType;
+  type: 'sports' | 'leisure' | 'tourism' | 'wellness' | 'education' | 'cultura' | 'lazer';
+  beach: string;
+  city: string;
+  price: number;
+  image?: string;
+  entrepreneur: string;
   description: string;
-  beach: string; // ID da praia
-  entrepreneur: string; // ID do empreendedor
-  location: {
-    meetingPoint: string;
-    latitude?: number;
-    longitude?: number;
-  };
-  schedule: Schedule[];
-  price: {
-    value: number;
-    currency: string;
-    paymentOptions: string[];
-    discounts?: {
-      description: string;
-      value: number;
-      type: 'percentage' | 'fixed';
-    }[];
-  };
-  photos: string[];
-  capacity: {
-    min: number;
-    max: number;
-    available: number;
-    socialQuota: number; // Vagas gratuitas (cota social)
-  };
-  requirements: string[]; // Requisitos para participação
-  equipments: {
-    provided: string[];
-    required: string[];
-  };
   tags: string[];
-  rating: number;
-  reviews: Review[];
-  createdAt: Date | string;
-  updatedAt: Date | string;
+  horarios: {
+    periodo: string;
+    horario: string;
+    local: string;
+    limiteAlunos: number;
+    alunosMatriculados: number;
+    diaSemana?: string;
+  }[];
+  status: ActivityStatus;
+  enrolledStudents: number;
+  createdAt: number;
+  updatedAt: number;
 }
 
 // Tipo para Tipo de Atividade
-export type ActivityType = 
+export type ActivityType =
   | 'sports' // Esportes
   | 'leisure' // Lazer
   | 'tourism' // Turismo
@@ -180,12 +171,10 @@ export interface Credential {
 }
 
 // Tipo para Status de Matrícula
-export type EnrollmentStatus = 
-  | 'pending' // Aguardando confirmação
-  | 'confirmed' // Confirmada
-  | 'cancelled' // Cancelada
-  | 'completed' // Concluída
-  | 'refunded'; // Reembolsada
+export type EnrollmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
+
+// Tipo para Status de Pagamento
+export type PaymentStatus = 'pending' | 'paid' | 'refunded';
 
 // Tipo para Matrícula
 export interface Enrollment {
@@ -193,37 +182,20 @@ export interface Enrollment {
   studentId: string;
   instructorId: string;
   activityId: string;
-  created: Date | string;
-  updated: Date | string;
-  status: EnrollmentStatus;  paymentInfo: {
+  studentName: string;
+  instructorName: string;
+  activityName: string;
+  status: EnrollmentStatus;
+  paymentInfo: {
     amount: number;
-    commission: number; // Comissão da plataforma (15%)
-    instructorAmount: number; // Valor líquido do instrutor (85%)
-    paymentMethod: 'pix';
-    paymentStatus: 'pending' | 'paid' | 'refunded';
-    paymentDate: Date | string;
+    commission: number;
+    instructorAmount: number;
+    paymentMethod: 'pix' | 'credit_card';
+    paymentStatus: PaymentStatus;
+    paymentDate: Date;
   };
-  attendance: {
-    present: boolean;
-    date?: Date | string;
-    notes?: string;
-  }[];
-  studentDetails: {
-    name: string;
-    email: string;
-    phone?: string;
-    photo?: string;
-  };
-  activityDetails: {
-    name: string;
-    type: ActivityType;
-    location: string;
-    schedule: {
-      date: Date | string;
-      startTime: string;
-      endTime: string;
-    };
-  };
+  created: Date;
+  updated: Date;
 }
 
 // Tipo para Transação Financeira
@@ -257,4 +229,70 @@ export interface InstructorFinancialSummary {
     amount: number;
     estimatedDate: Date | string;
   };
+}
+
+export interface Payment {
+  id: string;
+  studentId: string;
+  instructorId: string;
+  activityId: string;
+  enrollmentId: string;
+  studentName: string;
+  instructorName: string;
+  activityName: string;
+  amount: number;
+  status: PaymentStatus;
+  created: Date;
+  updated: Date;
+}
+
+export interface Rating {
+  id: string;
+  studentId: string;
+  instructorId: string;
+  activityId: string;
+  studentName: string;
+  instructorName: string;
+  activityName: string;
+  rating: number;
+  comment?: string;
+  created: Date;
+  updated: Date;
+}
+
+export interface Chat {
+  id: string;
+  participants: string[];
+  lastMessage?: {
+    text: string;
+    senderId: string;
+    senderName: string;
+    created: Date;
+  };
+  created: Date;
+  updated: Date;
+}
+
+export interface Message {
+  id: string;
+  chatId: string;
+  senderId: string;
+  receiverId: string;
+  senderName: string;
+  text: string;
+  read: boolean;
+  created: Date;
+  updated: Date;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'enrollment' | 'activity' | 'payment' | 'system' | 'status' | 'message' | 'rating';
+  title: string;
+  message: string;
+  data?: Record<string, any>;
+  read: boolean;
+  created: Date;
+  updated: Date;
 }

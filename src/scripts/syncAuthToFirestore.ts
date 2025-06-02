@@ -2,7 +2,7 @@
 // Cria documentos para usuários que só existem no Auth, e corrige roles inconsistentes
 // Execute com: npx ts-node src/scripts/syncAuthToFirestore.ts
 
-import { initializeApp, getApps, applicationDefault } from 'firebase-admin/app';
+import { initializeApp, getApps, applicationDefault, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
@@ -17,16 +17,31 @@ const auth = getAuth();
 const db = getFirestore();
 
 // Função utilitária para mapear roles para o padrão do sistema
-function normalizeRole(role: string | undefined, email: string): string {
-  if (!role) {
-    if (email === 'admin@praiativa.com' || email.includes('admin')) return 'admin';
-    if (email.includes('instrutor')) return 'instructor';
-    if (email.includes('empreendedor')) return 'entrepreneur';
-    return 'student';
+function normalizeRole(roleFromFirestore: string | undefined, email: string): string {
+  // 1. Se uma role já existe no Firestore e não é vazia, priorize-a.
+  if (roleFromFirestore) {
+    const lowerRole = roleFromFirestore.toLowerCase();
+    if (lowerRole === 'aluno') {
+      return 'student'; // Normaliza 'aluno' para 'student'
+    }
+    // Para qualquer outra role existente e válida (ex: 'instructor', 'admin', 'student', 'entrepreneur'),
+    // mantenha-a. Isso é crucial para não reclassificar incorretamente um 'instructor'.
+    // Certifique-se que os valores retornados aqui são compatíveis com User['role']
+    if (['practitioner', 'entrepreneur', 'admin', 'student', 'instructor'].includes(lowerRole)) {
+      return lowerRole;
+    }
+    // Se for uma role desconhecida, pode ser necessário decidir uma política (ex: logar e manter ou default)
+    // Por agora, vamos manter se não for 'aluno', mas idealmente deveria ser um dos tipos válidos.
+    return roleFromFirestore; // Ou uma lógica mais estrita para retornar um default se não for um tipo conhecido
   }
-  if (role === 'instrutor') return 'instructor';
-  if (role === 'aluno') return 'student';
-  return role;
+
+  // 2. Se não há role no Firestore (roleFromFirestore é undefined ou string vazia), tente inferir do email.
+  const lowerEmail = email.toLowerCase();
+  if (lowerEmail === 'admin@praiativa.com' || lowerEmail.includes('admin')) return 'admin';
+  if (lowerEmail.includes('instrutor')) return 'instructor';
+  if (lowerEmail.includes('empreendedor')) return 'entrepreneur';
+  
+    return 'student';
 }
 
 async function syncAuthToFirestore() {
@@ -48,12 +63,12 @@ async function syncAuthToFirestore() {
         const role = normalizeRole(undefined, email);
         await userDocRef.set({
           email,
-          name: displayName || '',
+          name: displayName || email.split('@')[0] || 'Usuário', // Melhor fallback para nome
           phone: phoneNumber || '',
           photoURL: photoURL || '',
-          role,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString(),
+          role: role,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(), // Adicionar updatedAt também na criação
         });
         action = 'created';
         totalCreated++;
@@ -62,7 +77,7 @@ async function syncAuthToFirestore() {
         const data = userDoc.data() || {};
         const normalizedRole = normalizeRole(data.role, email);
         if (data.role !== normalizedRole) {
-          await userDocRef.update({ role: normalizedRole });
+          await userDocRef.update({ role: normalizedRole, updatedAt: FieldValue.serverTimestamp() });
           action = 'updated';
           totalUpdated++;
         }

@@ -5,33 +5,49 @@ rules_version = '2';
 //    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
-    // Função para verificar autenticação
+    // Funções auxiliares
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Verifica se o usuário é dono do arquivo (baseado no path)
+    function isAdmin() {
+      return isAuthenticated() && 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < 5 * 1024 * 1024; // 5MB
+    }
+    
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
     
     // Regras para imagens de perfil
     match /profile/{userId}/{fileName} {
-      allow read: if true; // Qualquer pessoa pode ver fotos de perfil
-      allow write: if isAuthenticated() && isOwner(userId);
+      allow read: if true;
+      allow write: if isAuthenticated() && 
+                   isOwner(userId) && 
+                   isValidImage() &&
+                   fileName.matches('^[a-zA-Z0-9_-]+\\.(jpg|jpeg|png|gif)$');
     }
     
     // Regras para imagens de atividades
     match /activities/{activityId}/{fileName} {
-      allow read: if true; // Qualquer pessoa pode ver imagens de atividades
-      // Apenas o empreendedor dono da atividade pode fazer upload
-      allow write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated() && 
+                   isValidImage() &&
+                   fileName.matches('^[a-zA-Z0-9_-]+\\.(jpg|jpeg|png|gif)$');
     }
     
-    // Regras para outras imagens
+    // Regras para imagens de praias
     match /beaches/{beachId}/{fileName} {
       allow read: if true;
-      allow write: if isAuthenticated(); // Apenas administradores podem modificar
+      allow write: if isAuthenticated() && 
+                   isAdmin() && 
+                   isValidImage() &&
+                   fileName.matches('^[a-zA-Z0-9_-]+\\.(jpg|jpeg|png|gif)$');
     }
     
     // Regra padrão - bloqueia acesso não especificado

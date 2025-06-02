@@ -1,3 +1,88 @@
+# PraiAtiva
+
+Plataforma de atividades na praia.
+
+## Tecnologias
+
+- [Next.js](https://nextjs.org/)
+- [React](https://reactjs.org/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [Firebase](https://firebase.google.com/)
+- [Chakra UI](https://chakra-ui.com/)
+- [Framer Motion](https://www.framer.com/motion/)
+
+## Requisitos
+
+- Node.js 18.x ou superior
+- npm ou yarn
+
+## Instalação
+
+1. Clone o repositório:
+```bash
+git clone https://github.com/seu-usuario/praiativa.git
+cd praiativa
+```
+
+2. Instale as dependências:
+```bash
+npm install
+# ou
+yarn install
+```
+
+3. Crie um arquivo `.env.local` na raiz do projeto com as seguintes variáveis:
+```env
+# Firebase
+NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-auth-domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-storage-bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_NAME=PraiAtiva
+NEXT_PUBLIC_APP_DESCRIPTION=Plataforma de atividades na praia
+```
+
+4. Inicie o servidor de desenvolvimento:
+```bash
+npm run dev
+# ou
+yarn dev
+```
+
+5. Abra [http://localhost:3000](http://localhost:3000) no seu navegador.
+
+## Scripts
+
+- `npm run dev` ou `yarn dev`: Inicia o servidor de desenvolvimento
+- `npm run build` ou `yarn build`: Cria a versão de produção
+- `npm run start` ou `yarn start`: Inicia o servidor de produção
+- `npm run lint` ou `yarn lint`: Executa o linter
+- `npm run format` ou `yarn format`: Formata o código com Prettier
+
+## Estrutura do Projeto
+
+```
+src/
+  ├── components/     # Componentes React
+  ├── config/        # Configurações
+  ├── contexts/      # Contextos React
+  ├── hooks/         # Hooks personalizados
+  ├── pages/         # Páginas Next.js
+  ├── services/      # Serviços
+  ├── styles/        # Estilos
+  ├── types/         # Tipos TypeScript
+  └── utils/         # Funções utilitárias
+```
+
+## Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
 # Dashboard PraiAtiva - Melhorias de Interface
 
 Este projeto implementa melhorias na interface do dashboard de usuários do PraiAtiva, focando em uma abordagem "mobile-first" para garantir uma excelente experiência em dispositivos móveis.
