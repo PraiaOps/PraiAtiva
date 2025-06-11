@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { activityService } from '@/services/activityService';
 import { enrollmentService } from '@/services/enrollmentService';
+import { paymentService } from '@/services/paymentService';
 import { Activity } from '@/types';
 import { CheckCircleIcon, ClipboardIcon } from '@heroicons/react/24/outline';
 import Footer from '@/components/layout/Footer';
@@ -12,11 +13,13 @@ import { QRCodeSVG } from 'qrcode.react';
 
 export default function PaymentPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { user, userData } = useAuth();
+  const { user } = useAuth();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'completed'>('pending');
+  const [paymentStatus, setPaymentStatus] = useState<
+    'pending' | 'processing' | 'completed'
+  >('pending');
   const [copied, setCopied] = useState(false);
 
   // Chave PIX de exemplo (em produção, isso viria do backend)
@@ -64,7 +67,7 @@ export default function PaymentPage({ params }: { params: { id: string } }) {
       setLoading(true);
       setPaymentStatus('processing');
 
-      // Criar matrícula usando o enrollmentService
+      // 1. Criar matrícula
       const enrollmentId = await enrollmentService.createEnrollment({
         activityId: activity.id,
         studentId: user.uid,
@@ -72,34 +75,33 @@ export default function PaymentPage({ params }: { params: { id: string } }) {
         instructorId: activity.instructorId,
         instructorName: activity.instructorName,
         activityName: activity.name,
-        status: 'pending',
-        paymentInfo: {
-          amount: activity.price,
-          commission: activity.price * 0.15, // 15% de comissão
-          instructorAmount: activity.price * 0.85, // 85% para o instrutor
-          paymentMethod: 'pix',
-          paymentStatus: 'pending',
-          paymentDate: new Date()
-        },
-        created: new Date(),
-        updated: new Date()
-      });
-
-      // Simular processamento do pagamento
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Atualizar status do pagamento
-      await enrollmentService.updateEnrollment(enrollmentId, {
-        status: 'confirmed',
         paymentInfo: {
           amount: activity.price,
           commission: activity.price * 0.15,
           instructorAmount: activity.price * 0.85,
           paymentMethod: 'pix',
-          paymentStatus: 'paid',
-          paymentDate: new Date()
-        }
+          paymentStatus: 'pending',
+          paymentDate: new Date(),
+        },
       });
+
+      // 2. Criar registro de pagamento
+      const paymentId = await paymentService.createPayment({
+        studentId: user.uid,
+        studentName: user.displayName || 'Aluno',
+        instructorId: activity.instructorId,
+        activityId: activity.id,
+        enrollmentId: enrollmentId,
+        activityName: activity.name,
+        amount: activity.price,
+        paymentMethod: 'pix',
+      });
+
+      // 3. Simular processamento do pagamento
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 4. Atualizar status do pagamento (isso irá atualizar a matrícula também)
+      await paymentService.updatePaymentStatus(paymentId, 'paid', enrollmentId);
 
       setPaymentStatus('completed');
       setTimeout(() => {
@@ -157,17 +159,23 @@ export default function PaymentPage({ params }: { params: { id: string } }) {
                   </div>
 
                   <div className="mb-8">
-                    <h2 className="text-lg font-medium mb-4">Escaneie o QR Code</h2>
+                    <h2 className="text-lg font-medium mb-4">
+                      Escaneie o QR Code
+                    </h2>
                     <div className="bg-white p-4 rounded-lg border border-gray-200 inline-block">
                       <QRCodeSVG value={pixCopyPaste} size={200} />
                     </div>
                   </div>
 
                   <div className="mb-8">
-                    <h2 className="text-lg font-medium mb-2">Ou copie o código PIX</h2>
+                    <h2 className="text-lg font-medium mb-2">
+                      Ou copie o código PIX
+                    </h2>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <p className="text-sm font-mono break-all">{pixCopyPaste}</p>
+                        <p className="text-sm font-mono break-all">
+                          {pixCopyPaste}
+                        </p>
                       </div>
                       <button
                         onClick={handleCopyPix}
@@ -203,7 +211,9 @@ export default function PaymentPage({ params }: { params: { id: string } }) {
               {paymentStatus === 'completed' && (
                 <div className="text-center py-12">
                   <CheckCircleIcon className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                  <h2 className="text-2xl font-semibold mb-2">Pagamento Confirmado!</h2>
+                  <h2 className="text-2xl font-semibold mb-2">
+                    Pagamento Confirmado!
+                  </h2>
                   <p className="text-gray-600 mb-4">
                     Você será redirecionado para o dashboard em instantes...
                   </p>

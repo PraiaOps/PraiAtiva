@@ -1,4 +1,4 @@
-import { 
+import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -8,7 +8,7 @@ import {
   updateEmail,
   updateProfile,
   User as FirebaseUser,
-  onAuthStateChanged
+  onAuthStateChanged,
 } from 'firebase/auth';
 import { userService } from './userService';
 import { User, UserRole } from '@/types';
@@ -37,15 +37,15 @@ class AuthService {
         ...userData,
         email,
         uid: userCredential.user.uid,
-        created: new Date(),
-        updated: new Date()
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       const userId = await userService.createUser(user);
 
       return {
         id: userId,
-        ...user
+        ...user,
       };
     } catch (error) {
       console.error('Erro ao registrar usuário:', error);
@@ -160,7 +160,7 @@ class AuthService {
       if (userData) {
         await userService.updateUser(userData.id, {
           name: profile.displayName,
-          photoURL: profile.photoURL
+          photoURL: profile.photoURL,
         });
       }
     } catch (error) {
@@ -190,7 +190,7 @@ class AuthService {
    * Escuta mudanças no estado de autenticação
    */
   onAuthStateChanged(callback: (user: User | null) => void): () => void {
-    return onAuthStateChanged(this.auth, async (firebaseUser) => {
+    return onAuthStateChanged(this.auth, async firebaseUser => {
       if (firebaseUser) {
         const user = await userService.getUserByEmail(firebaseUser.email!);
         callback(user);
@@ -240,4 +240,4 @@ class AuthService {
   }
 }
 
-export const authService = new AuthService(); 
+export const authService = new AuthService();

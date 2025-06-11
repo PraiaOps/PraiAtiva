@@ -1,5 +1,5 @@
 import { db } from '@/config/firebase';
-import { 
+import {
   collection,
   doc,
   getDoc,
@@ -11,8 +11,10 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
-  limit,
-  startAfter
+  deleteDoc,
+  DocumentReference,
+  CollectionReference,
+  writeBatch,
 } from 'firebase/firestore';
 import { Payment, PaymentStatus } from '@/types';
 import { notificationService } from './notificationService';
@@ -20,26 +22,71 @@ import { notificationService } from './notificationService';
 class PaymentService {
   private paymentsCollection = 'payments';
 
+  private async commitWithRetry(batch: any): Promise<void> {
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        await batch.commit();
+        return;
+      } catch (error) {
+        retries--;
+        if (retries === 0) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+
   /**
-   * Cria um novo pagamento
+   * Cria um novo pagamento e simula pagamento PIX aprovado automaticamente
    */
-  async createPayment(payment: Omit<Payment, 'id'>): Promise<string> {
+  async createPayment(
+    payment: Omit<Payment, 'id' | 'createdAt' | 'updatedAt' | 'status'>
+  ): Promise<string> {
     try {
-      const paymentRef = await addDoc(collection(db, this.paymentsCollection), {
+      // Create document reference
+      const paymentRef = doc(collection(db, this.paymentsCollection));
+      const batch = writeBatch(db);
+
+      // Add payment to batch
+      batch.set(paymentRef, {
         ...payment,
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
-        status: 'pending'
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        status: 'pending' as PaymentStatus,
       });
 
-      // Notificar o instrutor sobre o novo pagamento
-      await notificationService.createPaymentNotification(
-        payment.instructorId,
-        payment.studentName,
-        payment.activityName,
-        payment.amount,
-        paymentRef.id
-      );
+      // Commit batch with retries
+      await this.commitWithRetry(batch);
+
+      // Simulate PIX payment after successful creation
+      setTimeout(async () => {
+        try {
+          await this.updatePaymentStatus(
+            paymentRef.id,
+            'paid',
+            payment.enrollmentId
+          );
+        } catch (error) {
+          console.error('Erro ao simular pagamento:', error);
+        }
+      }, 2000);
+
+      // Create notification in a separate try-catch
+      try {
+        await notificationService.createNotification({
+          type: 'payment',
+          userId: payment.instructorId,
+          title: 'Novo Pagamento',
+          message: `${payment.studentName} iniciou um pagamento para ${payment.activityName}`,
+          data: {
+            paymentId: paymentRef.id,
+            amount: payment.amount,
+          },
+        });
+      } catch (error) {
+        console.error('Erro ao criar notificação:', error);
+        // Don't throw - payment was created successfully
+      }
 
       return paymentRef.id;
     } catch (error) {
@@ -49,17 +96,72 @@ class PaymentService {
   }
 
   /**
-   * Atualiza um pagamento
+   * Atualiza o status do pagamento e sincroniza com a matrícula
    */
-  async updatePayment(id: string, payment: Partial<Payment>): Promise<void> {
+  async updatePaymentStatus(
+    paymentId: string,
+    status: PaymentStatus,
+    enrollmentId: string
+  ): Promise<void> {
     try {
-      const paymentRef = doc(db, this.paymentsCollection, id);
-      await updateDoc(paymentRef, {
-        ...payment,
-        updated: serverTimestamp()
+      const batch = writeBatch(db);
+      const paymentRef = doc(db, this.paymentsCollection, paymentId);
+      const paymentDoc = await getDoc(paymentRef);
+
+      if (!paymentDoc.exists()) {
+        throw new Error('Pagamento não encontrado');
+      }
+
+      const payment = paymentDoc.data() as Payment;
+
+      // Add payment update to batch
+      batch.update(paymentRef, {
+        status,
+        updatedAt: serverTimestamp(),
+        ...(status === 'paid' ? { paidAt: serverTimestamp() } : {}),
       });
+
+      // Commit batch with retries
+      await this.commitWithRetry(batch);
+
+      // Update enrollment in a separate try-catch
+      try {
+        const { enrollmentService } = await import('./enrollmentService');
+
+        if (status === 'paid') {
+          await enrollmentService.confirmEnrollment(enrollmentId);
+        } else if (status !== 'pending') {
+          await enrollmentService.cancelEnrollment(enrollmentId);
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar matrícula:', error);
+      }
+
+      // Create notification in a separate try-catch
+      try {
+        await notificationService.createNotification({
+          type: 'payment',
+          userId: payment.studentId,
+          title: 'Status do Pagamento Atualizado',
+          message: `Seu pagamento para ${payment.activityName} foi ${
+            status === 'paid'
+              ? 'confirmado'
+              : status === 'pending'
+              ? 'registrado'
+              : 'cancelado'
+          }`,
+          data: {
+            paymentId,
+            amount: payment.amount,
+            status,
+            enrollmentId,
+          },
+        });
+      } catch (error) {
+        console.error('Erro ao criar notificação:', error);
+      }
     } catch (error) {
-      console.error('Erro ao atualizar pagamento:', error);
+      console.error('Erro ao atualizar status do pagamento:', error);
       throw error;
     }
   }
@@ -71,14 +173,14 @@ class PaymentService {
     try {
       const paymentRef = doc(db, this.paymentsCollection, id);
       const paymentDoc = await getDoc(paymentRef);
-      
+
       if (paymentDoc.exists()) {
         return {
           id: paymentDoc.id,
-          ...paymentDoc.data()
+          ...paymentDoc.data(),
         } as Payment;
       }
-      
+
       return null;
     } catch (error) {
       console.error('Erro ao buscar pagamento:', error);
@@ -97,40 +199,38 @@ class PaymentService {
     status?: PaymentStatus;
   }): Promise<Payment[]> {
     try {
-      let q = collection(db, this.paymentsCollection);
-      
-      if (filters) {
-        const constraints = [];
-        
-        if (filters.studentId) {
-          constraints.push(where('studentId', '==', filters.studentId));
-        }
-        
-        if (filters.instructorId) {
-          constraints.push(where('instructorId', '==', filters.instructorId));
-        }
-        
-        if (filters.activityId) {
-          constraints.push(where('activityId', '==', filters.activityId));
-        }
-        
-        if (filters.enrollmentId) {
-          constraints.push(where('enrollmentId', '==', filters.enrollmentId));
-        }
-        
-        if (filters.status) {
-          constraints.push(where('status', '==', filters.status));
-        }
-        
-        q = query(q, ...constraints, orderBy('created', 'desc'));
-      } else {
-        q = query(q, orderBy('created', 'desc'));
+      const paymentsRef = collection(db, this.paymentsCollection);
+      const constraints = [];
+
+      if (filters?.studentId) {
+        constraints.push(where('studentId', '==', filters.studentId));
       }
-      
+
+      if (filters?.instructorId) {
+        constraints.push(where('instructorId', '==', filters.instructorId));
+      }
+
+      if (filters?.activityId) {
+        constraints.push(where('activityId', '==', filters.activityId));
+      }
+
+      if (filters?.enrollmentId) {
+        constraints.push(where('enrollmentId', '==', filters.enrollmentId));
+      }
+
+      if (filters?.status) {
+        constraints.push(where('status', '==', filters.status));
+      }
+
+      const q =
+        constraints.length > 0
+          ? query(paymentsRef, ...constraints, orderBy('createdAt', 'desc'))
+          : query(paymentsRef, orderBy('createdAt', 'desc'));
+
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Payment[];
     } catch (error) {
       console.error('Erro ao listar pagamentos:', error);
@@ -139,161 +239,75 @@ class PaymentService {
   }
 
   /**
-   * Escuta pagamentos em tempo real
-   */
-  subscribeToPayments(callback: (payments: Payment[]) => void, filters?: {
-    studentId?: string;
-    instructorId?: string;
-    activityId?: string;
-    enrollmentId?: string;
-    status?: PaymentStatus;
-  }) {
-    let q = collection(db, this.paymentsCollection);
-    
-    if (filters) {
-      const constraints = [];
-      
-      if (filters.studentId) {
-        constraints.push(where('studentId', '==', filters.studentId));
-      }
-      
-      if (filters.instructorId) {
-        constraints.push(where('instructorId', '==', filters.instructorId));
-      }
-      
-      if (filters.activityId) {
-        constraints.push(where('activityId', '==', filters.activityId));
-      }
-      
-      if (filters.enrollmentId) {
-        constraints.push(where('enrollmentId', '==', filters.enrollmentId));
-      }
-      
-      if (filters.status) {
-        constraints.push(where('status', '==', filters.status));
-      }
-      
-      q = query(q, ...constraints, orderBy('created', 'desc'));
-    } else {
-      q = query(q, orderBy('created', 'desc'));
-    }
-
-    return onSnapshot(q, (snapshot) => {
-      const payments = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Payment[];
-      
-      callback(payments);
-    });
-  }
-
-  /**
-   * Busca pagamentos de um aluno
-   */
-  async getStudentPayments(studentId: string): Promise<Payment[]> {
-    try {
-      const q = query(
-        collection(db, this.paymentsCollection),
-        where('studentId', '==', studentId),
-        orderBy('created', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Payment[];
-    } catch (error) {
-      console.error('Erro ao buscar pagamentos do aluno:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Busca pagamentos de um instrutor
-   */
-  async getInstructorPayments(instructorId: string): Promise<Payment[]> {
-    try {
-      const q = query(
-        collection(db, this.paymentsCollection),
-        where('instructorId', '==', instructorId),
-        orderBy('created', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Payment[];
-    } catch (error) {
-      console.error('Erro ao buscar pagamentos do instrutor:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Busca pagamentos de uma atividade
-   */
-  async getActivityPayments(activityId: string): Promise<Payment[]> {
-    try {
-      const q = query(
-        collection(db, this.paymentsCollection),
-        where('activityId', '==', activityId),
-        orderBy('created', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Payment[];
-    } catch (error) {
-      console.error('Erro ao buscar pagamentos da atividade:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Atualiza status do pagamento
-   */
-  async updatePaymentStatus(id: string, status: PaymentStatus): Promise<void> {
-    try {
-      const paymentRef = doc(db, this.paymentsCollection, id);
-      await updateDoc(paymentRef, {
-        status,
-        updated: serverTimestamp()
-      });
-
-      // Notificar o aluno sobre a mudança de status
-      const payment = await this.getPayment(id);
-      if (payment) {
-        await notificationService.createPaymentStatusNotification(
-          payment.studentId,
-          payment.instructorName,
-          payment.activityName,
-          payment.amount,
-          status,
-          id
-        );
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar status do pagamento:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Deleta um pagamento
+   * Deleta um pagamento (apenas se estiver pendente)
    */
   async deletePayment(id: string): Promise<void> {
     try {
-      const paymentRef = doc(db, this.paymentsCollection, id);
-      await paymentRef.delete();
+      const payment = await this.getPayment(id);
+      if (!payment) {
+        throw new Error('Pagamento não encontrado');
+      }
+
+      if (payment.status !== 'pending') {
+        throw new Error('Apenas pagamentos pendentes podem ser deletados');
+      }
+
+      await deleteDoc(doc(db, this.paymentsCollection, id));
     } catch (error) {
       console.error('Erro ao deletar pagamento:', error);
       throw error;
     }
+  }
+
+  /**
+   * Escuta pagamentos em tempo real
+   */
+  subscribeToPayments(
+    callback: (payments: Payment[]) => void,
+    filters?: {
+      studentId?: string;
+      instructorId?: string;
+      activityId?: string;
+      enrollmentId?: string;
+      status?: PaymentStatus;
+    }
+  ) {
+    const paymentsRef = collection(db, this.paymentsCollection);
+    const constraints = [];
+
+    if (filters?.studentId) {
+      constraints.push(where('studentId', '==', filters.studentId));
+    }
+
+    if (filters?.instructorId) {
+      constraints.push(where('instructorId', '==', filters.instructorId));
+    }
+
+    if (filters?.activityId) {
+      constraints.push(where('activityId', '==', filters.activityId));
+    }
+
+    if (filters?.enrollmentId) {
+      constraints.push(where('enrollmentId', '==', filters.enrollmentId));
+    }
+
+    if (filters?.status) {
+      constraints.push(where('status', '==', filters.status));
+    }
+
+    const q =
+      constraints.length > 0
+        ? query(paymentsRef, ...constraints, orderBy('createdAt', 'desc'))
+        : query(paymentsRef, orderBy('createdAt', 'desc'));
+
+    return onSnapshot(q, snapshot => {
+      const payments = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Payment[];
+
+      callback(payments);
+    });
   }
 }
 

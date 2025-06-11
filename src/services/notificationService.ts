@@ -14,37 +14,55 @@ import {
   getDocs,
   getDoc,
   limit,
-  startAfter
+  startAfter,
+  writeBatch,
 } from 'firebase/firestore';
-import { EnrollmentStatus } from '@/types';
-import { Notification } from '@/types';
-
-export interface Notification {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: 'enrollment' | 'activity' | 'payment' | 'system' | 'status' | 'message' | 'rating';
-  read: boolean;
-  createdAt: Date | string;
-  data?: any;
-}
+import { EnrollmentStatus, NotificationType, type Notification } from '@/types';
 
 class NotificationService {
   private notificationsCollection = 'notifications';
 
   /**
+   * Cria uma notificação base com tratamento de erros
+   */
+  private async createBaseNotification(data: {
+    userId: string;
+    type: NotificationType;
+    title: string;
+    message: string;
+    data?: Record<string, any>;
+  }): Promise<string> {
+    try {
+      const notification: Omit<Notification, 'id'> = {
+        ...data,
+        read: false,
+        createdAt: serverTimestamp() as any,
+        updatedAt: serverTimestamp() as any,
+      };
+
+      const docRef = await addDoc(
+        collection(db, this.notificationsCollection),
+        notification
+      );
+      return docRef.id;
+    } catch (error) {
+      console.error('Erro ao criar notificação:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Cria uma notificação
    */
-  async createNotification(notification: Omit<Notification, 'id'>): Promise<string> {
+  async createNotification(data: {
+    type: NotificationType;
+    userId: string;
+    title: string;
+    message: string;
+    data?: Record<string, any>;
+  }): Promise<string> {
     try {
-      const notificationRef = await addDoc(collection(db, this.notificationsCollection), {
-        ...notification,
-        createdAt: serverTimestamp(),
-        read: false
-      });
-
-      return notificationRef.id;
+      return await this.createBaseNotification(data);
     } catch (error) {
       console.error('Erro ao criar notificação:', error);
       throw error;
@@ -65,7 +83,7 @@ class NotificationService {
       type: 'message',
       title: 'Nova mensagem',
       message: `${senderName} enviou uma mensagem: ${messageText}`,
-      data: { chatId }
+      data: { chatId },
     });
   }
 
@@ -83,25 +101,7 @@ class NotificationService {
       type: 'rating',
       title: 'Nova avaliação',
       message: `${studentName} avaliou sua aula "${activityName}"`,
-      data: { ratingId }
-    });
-  }
-
-  /**
-   * Cria notificação de nova inscrição
-   */
-  async createEnrollmentNotification(
-    userId: string,
-    studentName: string,
-    activityName: string,
-    enrollmentId: string
-  ): Promise<string> {
-    return this.createNotification({
-      userId,
-      type: 'enrollment',
-      title: 'Nova inscrição',
-      message: `${studentName} se inscreveu na sua aula "${activityName}"`,
-      data: { enrollmentId }
+      data: { ratingId },
     });
   }
 
@@ -110,9 +110,14 @@ class NotificationService {
    */
   async markAsRead(notificationId: string): Promise<void> {
     try {
-      const notificationRef = doc(db, this.notificationsCollection, notificationId);
+      const notificationRef = doc(
+        db,
+        this.notificationsCollection,
+        notificationId
+      );
       await updateDoc(notificationRef, {
-        read: true
+        read: true,
+        updatedAt: serverTimestamp(),
       });
     } catch (error) {
       console.error('Erro ao marcar notificação como lida:', error);
@@ -132,10 +137,13 @@ class NotificationService {
       );
 
       const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
 
-      const batch = db.batch();
       snapshot.docs.forEach(doc => {
-        batch.update(doc.ref, { read: true });
+        batch.update(doc.ref, {
+          read: true,
+          updatedAt: serverTimestamp(),
+        });
       });
 
       await batch.commit();
@@ -151,25 +159,29 @@ class NotificationService {
   async listUserNotifications(
     userId: string,
     lastNotificationId?: string,
-    limit: number = 20
+    pageSize: number = 20
   ): Promise<Notification[]> {
     try {
       let q = query(
         collection(db, this.notificationsCollection),
         where('userId', '==', userId),
         orderBy('createdAt', 'desc'),
-        limit(limit)
+        limit(pageSize)
       );
 
       if (lastNotificationId) {
-        const lastNotificationDoc = await getDoc(doc(db, this.notificationsCollection, lastNotificationId));
-        q = query(q, startAfter(lastNotificationDoc));
+        const lastNotificationDoc = await getDoc(
+          doc(db, this.notificationsCollection, lastNotificationId)
+        );
+        if (lastNotificationDoc.exists()) {
+          q = query(q, startAfter(lastNotificationDoc));
+        }
       }
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Notification[];
     } catch (error) {
       console.error('Erro ao listar notificações:', error);
@@ -180,17 +192,20 @@ class NotificationService {
   /**
    * Escuta notificações em tempo real
    */
-  subscribeToNotifications(userId: string, callback: (notifications: Notification[]) => void) {
+  subscribeToNotifications(
+    userId: string,
+    callback: (notifications: Notification[]) => void
+  ) {
     const q = query(
       collection(db, this.notificationsCollection),
       where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     );
 
-    return onSnapshot(q, (snapshot) => {
+    return onSnapshot(q, snapshot => {
       const notifications = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Notification[];
 
       callback(notifications);
@@ -221,8 +236,12 @@ class NotificationService {
    */
   async deleteNotification(notificationId: string): Promise<void> {
     try {
-      const notificationRef = doc(db, this.notificationsCollection, notificationId);
-      await notificationRef.delete();
+      const notificationRef = doc(
+        db,
+        this.notificationsCollection,
+        notificationId
+      );
+      await deleteDoc(notificationRef);
     } catch (error) {
       console.error('Erro ao deletar notificação:', error);
       throw error;
@@ -240,8 +259,8 @@ class NotificationService {
       );
 
       const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
 
-      const batch = db.batch();
       snapshot.docs.forEach(doc => {
         batch.delete(doc.ref);
       });
@@ -254,31 +273,25 @@ class NotificationService {
   }
 
   /**
-   * Cria uma notificação de nova matrícula
+   * Cria notificação com retry para inscrição
    */
   async createEnrollmentNotification(
     instructorId: string,
     studentName: string,
     activityName: string,
     enrollmentId: string
-  ): Promise<void> {
-    try {
-      await addDoc(collection(db, this.notificationsCollection), {
-        userId: instructorId,
-        type: 'enrollment',
-        title: 'Nova Matrícula',
-        message: `${studentName} se matriculou em ${activityName}`,
-        read: false,
-        createdAt: serverTimestamp(),
-        data: {
-          enrollmentId,
-          activityName,
-          studentName
-        }
-      });
-    } catch (error) {
-      console.error('Erro ao criar notificação de matrícula:', error);
-    }
+  ): Promise<string> {
+    return this.createNotification({
+      userId: instructorId,
+      type: 'enrollment',
+      title: 'Nova Matrícula',
+      message: `${studentName} se matriculou em ${activityName}`,
+      data: {
+        enrollmentId,
+        activityName,
+        studentName,
+      },
+    });
   }
 
   /**
@@ -289,32 +302,25 @@ class NotificationService {
     activityName: string,
     status: EnrollmentStatus,
     enrollmentId: string
-  ): Promise<void> {
-    try {
-      const statusMessages = {
-        pending: 'Aguardando confirmação',
-        confirmed: 'Confirmada',
-        cancelled: 'Cancelada',
-        completed: 'Concluída',
-        refunded: 'Reembolsada'
-      };
+  ): Promise<string> {
+    const statusMessages = {
+      pending: 'Aguardando confirmação',
+      confirmed: 'Confirmada',
+      cancelled: 'Cancelada',
+      completed: 'Concluída',
+    };
 
-      await addDoc(collection(db, this.notificationsCollection), {
-        userId: studentId,
-        type: 'status',
-        title: 'Status da Matrícula Atualizado',
-        message: `Sua matrícula em ${activityName} foi ${statusMessages[status]}`,
-        read: false,
-        createdAt: serverTimestamp(),
-        data: {
-          enrollmentId,
-          activityName,
-          status
-        }
-      });
-    } catch (error) {
-      console.error('Erro ao criar notificação de status:', error);
-    }
+    return this.createNotification({
+      userId: studentId,
+      type: 'enrollment',
+      title: 'Status da Matrícula Atualizado',
+      message: `Sua matrícula em ${activityName} foi ${statusMessages[status]}`,
+      data: {
+        enrollmentId,
+        activityName,
+        status,
+      },
+    });
   }
 
   /**
@@ -325,39 +331,37 @@ class NotificationService {
     amount: number,
     status: 'pending' | 'paid' | 'refunded',
     enrollmentId: string
-  ): Promise<void> {
-    try {
-      const statusMessages = {
-        pending: 'pendente',
-        paid: 'confirmado',
-        refunded: 'reembolsado'
-      };
+  ): Promise<string> {
+    const statusMessages = {
+      pending: 'pendente',
+      paid: 'confirmado',
+      refunded: 'reembolsado',
+    };
 
-      await addDoc(collection(db, this.notificationsCollection), {
-        userId: studentId,
-        type: 'payment',
-        title: 'Status do Pagamento Atualizado',
-        message: `Seu pagamento de R$ ${amount.toFixed(2)} foi ${statusMessages[status]}`,
-        read: false,
-        createdAt: serverTimestamp(),
-        data: {
-          enrollmentId,
-          amount,
-          status
-        }
-      });
-    } catch (error) {
-      console.error('Erro ao criar notificação de pagamento:', error);
-    }
+    return this.createNotification({
+      userId: studentId,
+      type: 'payment',
+      title: 'Status do Pagamento Atualizado',
+      message: `Seu pagamento de R$ ${amount.toFixed(2)} foi ${
+        statusMessages[status]
+      }`,
+      data: {
+        enrollmentId,
+        amount,
+        status,
+      },
+    });
   }
 
-  // Notificações específicas para atividades
+  /**
+   * Cria notificação de atividade
+   */
   async createActivityNotification(
     instructorId: string,
     activityName: string,
     message: string,
     activityId: string
-  ) {
+  ): Promise<string> {
     return this.createNotification({
       userId: instructorId,
       title: 'Atualização de Atividade',
@@ -367,12 +371,15 @@ class NotificationService {
     });
   }
 
+  /**
+   * Cria notificação de atualização de atividade
+   */
   async createActivityUpdateNotification(
     studentId: string,
     activityName: string,
     message: string,
     activityId: string
-  ) {
+  ): Promise<string> {
     return this.createNotification({
       userId: studentId,
       title: 'Atividade Atualizada',
@@ -382,8 +389,14 @@ class NotificationService {
     });
   }
 
-  // Notificações do sistema
-  async createSystemNotification(userId: string, title: string, message: string) {
+  /**
+   * Cria notificação do sistema
+   */
+  async createSystemNotification(
+    userId: string,
+    title: string,
+    message: string
+  ): Promise<string> {
     return this.createNotification({
       userId,
       title,

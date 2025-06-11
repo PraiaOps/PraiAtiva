@@ -67,45 +67,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
-  // Função utilitária para normalizar o campo role
-  function normalizeRole(role: string | undefined, email: string | undefined): string {
-    if (!role || !['admin', 'instructor', 'student'].includes(role)) {
-      if (!email) return 'student';
-      const lower = email.toLowerCase();
-      if (lower === 'admin@praiativa.com' || lower.includes('admin')) return 'admin';
-      if (lower.includes('instrutor') || lower.includes('instructor')) return 'instructor';
-      return 'student';
-    }
-    if (role === 'instrutor') return 'instructor';
-    if (role === 'aluno') return 'student';
-    return role;
-  }
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       
+      // Update session cookie
       if (user) {
         try {
-          console.log('Usuário autenticado:', user.email);
-          
           // Get id token
           const idToken = await user.getIdToken();
-          document.cookie = `session=${idToken}; path=/; max-age=3600; samesite=strict`;
           
+          // Set session cookie
+          document.cookie = `session=${idToken}; path=/; max-age=3600; samesite=strict`;
+        } catch (error) {
+          console.error("Erro ao atualizar cookie de sessão:", error);
+        }
+      } else {
+        // Clear session cookie on logout
+        document.cookie = 'session=; path=/; max-age=0';
+      }
+      
+      if (user) {
+        try {
           // First check if user exists in Firestore
           const userRef = doc(db, "users", user.uid);
           const userDoc = await getDoc(userRef);
           
           // Get stored user data or create new profile
           let storedUserData = userDoc.exists() ? userDoc.data() : null;
-          console.log('Dados do usuário no Firestore:', storedUserData);
           
           if (!storedUserData) {
             // Create new user profile with default role
             storedUserData = {
               email: user.email,
-              name: user.displayName || user.email?.split('@')[0] || 'Usuário',
               createdAt: serverTimestamp(),
               lastLogin: serverTimestamp(),
               role: 'student' // default role
@@ -113,7 +107,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             // Save new user profile
             await setDoc(userRef, storedUserData);
-            console.log('Novo perfil criado:', storedUserData);
           }
           
           // Determine role based on stored data or email pattern
@@ -126,6 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               role = 'admin';
             } else if (email.includes('instrutor') || storedUserData.isInstructor) {
               role = 'instructor';
+            } else if (email.includes('empreendedor')) {
+              role = 'entrepreneur';
             }
             
             // Update role in Firestore if it changed
@@ -133,38 +128,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             storedUserData.role = role;
           }
           
-          // Garantir que o nome do usuário está definido
-          if (!storedUserData.name) {
-            const defaultName = user.displayName || user.email?.split('@')[0] || 'Usuário';
-            await setDoc(userRef, { name: defaultName }, { merge: true });
-            storedUserData.name = defaultName;
-          }
-          
           // Convert timestamps and set user data
           const userData = {
             ...convertFirestoreTimestamps(storedUserData),
-            name: storedUserData.name || user.displayName || user.email?.split('@')[0] || 'Usuário',
             role: storedUserData.role,
             isAdmin: storedUserData.role === 'admin',
-            isInstructor: storedUserData.role === 'instructor'
+            isInstructor: storedUserData.role === 'instructor',
+            isEntrepreneur: storedUserData.role === 'entrepreneur'
           };
           
-          console.log('Dados do usuário final:', userData);
           setUserData(userData);
         } catch (error) {
           console.error("Erro ao carregar dados do usuário:", error);
-          // Garantir que mesmo em caso de erro, temos um nome
-          const fallbackName = user.displayName || user.email?.split('@')[0] || 'Usuário';
           setUserData({
             email: user.email,
-            name: fallbackName,
             role: 'student',
             lastLogin: new Date().toISOString()
           });
         }
       } else {
         setUserData(null);
-        document.cookie = 'session=; path=/; max-age=0';
       }
       
       setLoading(false);
@@ -191,6 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role = 'admin';
           } else if (email.includes('instrutor') || storedUserData.isInstructor) {
             role = 'instructor';
+          } else if (email.includes('empreendedor')) {
+            role = 'entrepreneur';
           }
           
           // Update role in Firestore
@@ -246,6 +231,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }
   };
+
+  // Função utilitária para normalizar o campo role
+  function normalizeRole(role: string | undefined, email: string | undefined): string {
+    if (!role || !['admin','instructor','entrepreneur','student'].includes(role)) {
+      if (!email) return 'student';
+      const lower = email.toLowerCase();
+      if (lower === 'admin@praiativa.com' || lower.includes('admin')) return 'admin';
+      if (lower.includes('instrutor') || lower.includes('instructor')) return 'instructor';
+      if (lower.includes('empreendedor') || lower.includes('entrepreneur')) return 'entrepreneur';
+      return 'student';
+    }
+    if (role === 'instrutor') return 'instructor';
+    if (role === 'aluno') return 'student';
+    return role;
+  }
 
   const signUp = async (email: string, password: string, userData?: any): Promise<UserCredential> => {
     try {
@@ -311,45 +311,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userRef = doc(db, "users", userCredential.user.uid);
           const userDoc = await getDoc(userRef);
           let userData = userDoc.exists() ? userDoc.data() : {};
-          
-          // Normalizar o papel do usuário
-          const role = normalizeRole(userData.role, userCredential.user.email || undefined);
-          
-          // Preparar dados do usuário
-          const updatedUserData = {
-            ...userData,
-            email: userCredential.user.email,
-            role: role,
-            lastLogin: serverTimestamp(),
-            isAdmin: role === 'admin',
-            isInstructor: role === 'instructor'
-          };
-
+          userData.role = normalizeRole(userData.role, userCredential.user.email || undefined);
           if (!userDoc.exists()) {
-            updatedUserData.createdAt = serverTimestamp();
-            console.log('[AuthContext] signIn: criando perfil mínimo no Firestore', userRef.path, updatedUserData);
+            userData = {
+              email: userCredential.user.email,
+              role: userData.role,
+              createdAt: serverTimestamp(),
+              lastLogin: serverTimestamp(),
+            };
+            console.log('[AuthContext] signIn: criando perfil mínimo no Firestore', userRef.path, userData);
           } else {
-            console.log('[AuthContext] signIn: atualizando perfil no Firestore', userRef.path, updatedUserData);
+            userData.lastLogin = serverTimestamp();
+            console.log('[AuthContext] signIn: atualizando perfil no Firestore', userRef.path, userData);
           }
-
-          // Salvar no Firestore
-          await withTimeout(setDoc(userRef, updatedUserData, { merge: true }), FIRESTORE_TIMEOUT);
-          
-          // Atualizar o estado local
-          setUserData({
-            ...updatedUserData,
-            lastLogin: new Date().toISOString(),
-            createdAt: userData.createdAt ? new Date(userData.createdAt.seconds * 1000).toISOString() : new Date().toISOString()
-          });
-
+          await withTimeout(setDoc(userRef, userData, { merge: true }), FIRESTORE_TIMEOUT);
           // Redirecionamento
           let redirectPath = '/';
-          switch (role) {
+          switch (userData.role) {
             case 'admin':
               redirectPath = '/dashboard/admin';
               break;
             case 'instructor':
               redirectPath = '/dashboard/instrutor';
+              break;
+            case 'entrepreneur':
+              redirectPath = '/dashboard/empreendedor';
               break;
             case 'student':
               redirectPath = '/dashboard/aluno';

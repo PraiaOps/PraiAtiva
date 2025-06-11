@@ -11,63 +11,73 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
-  Timestamp,
-  deleteDoc,
-  limit,
-  startAfter
+  writeBatch,
+  QueryConstraint,
 } from 'firebase/firestore';
-import {
-  Enrollment,
-  EnrollmentStatus,
-  Activity,
-  User,
-  Transaction,
-  InstructorFinancialSummary
-} from '@/types';
+import { Enrollment, EnrollmentStatus } from '@/types';
 import { notificationService } from './notificationService';
 import { activityService } from './activityService';
-import { stripeService } from './stripeService';
 
 class EnrollmentService {
   private enrollmentsCollection = 'enrollments';
-  private transactionsCollection = 'transactions';
+
+  private async commitWithRetry(batch: any): Promise<void> {
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        await batch.commit();
+        return;
+      } catch (error) {
+        retries--;
+        if (retries === 0) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
 
   /**
-   * Cria uma nova inscrição
+   * Cria uma nova inscrição com tratamento de erros e retries
    */
-  async createEnrollment(enrollment: Omit<Enrollment, 'id'>): Promise<string> {
+  async createEnrollment(
+    enrollment: Omit<Enrollment, 'id' | 'status' | 'createdAt' | 'updatedAt'>
+  ): Promise<string> {
     try {
-      const enrollmentRef = await addDoc(collection(db, this.enrollmentsCollection), {
+      // Create enrollment document
+      const enrollmentRef = doc(collection(db, this.enrollmentsCollection));
+      const batch = writeBatch(db);
+
+      // Add enrollment to batch
+      batch.set(enrollmentRef, {
         ...enrollment,
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
-        status: 'pending'
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
-      // Notificar o instrutor sobre a nova inscrição
-      await notificationService.createEnrollmentNotification(
-        enrollment.instructorId,
-        enrollment.studentName,
-        enrollment.activityName,
-        enrollmentRef.id
-      );
+      // Commit batch with retries
+      await this.commitWithRetry(batch);
 
-      // Criar sessão de pagamento no Stripe apenas se não for PIX
-      if (enrollment.paymentInfo.paymentMethod !== 'pix') {
-        const sessionId = await stripeService.createPaymentSession({
-          id: enrollmentRef.id,
-          studentId: enrollment.studentId,
-          instructorId: enrollment.instructorId,
-          activityId: enrollment.activityId,
-          enrollmentId: enrollmentRef.id,
-          studentName: enrollment.studentName,
-          instructorName: enrollment.instructorName,
-          activityName: enrollment.activityName,
-          amount: enrollment.paymentInfo.amount,
-          status: 'pending',
-          created: new Date(),
-          updated: new Date()
+      // After successful enrollment creation, try to update related data
+      try {
+        await Promise.all([
+          activityService.updateEnrolledStudents(enrollment.activityId, 1),
+          notificationService.createNotification({
+            type: 'enrollment',
+            userId: enrollment.instructorId,
+            title: 'Nova Inscrição',
+            message: `${enrollment.studentName} se inscreveu em ${enrollment.activityName}`,
+            data: {
+              enrollmentId: enrollmentRef.id,
+              activityId: enrollment.activityId,
+            },
+          }),
+        ]).catch(error => {
+          console.error('Erro ao atualizar dados relacionados:', error);
+          // Don't throw - enrollment was created successfully
         });
+      } catch (error) {
+        console.error('Erro ao atualizar dados relacionados:', error);
+        // Don't throw - enrollment was created successfully
       }
 
       return enrollmentRef.id;
@@ -78,133 +88,84 @@ class EnrollmentService {
   }
 
   /**
-   * Atualiza uma inscrição
+   * Confirma uma inscrição após pagamento
    */
-  async updateEnrollment(id: string, enrollment: Partial<Enrollment>): Promise<void> {
+  async confirmEnrollment(id: string): Promise<void> {
     try {
       const enrollmentRef = doc(db, this.enrollmentsCollection, id);
+      const enrollmentSnap = await getDoc(enrollmentRef);
+
+      if (!enrollmentSnap.exists()) {
+        throw new Error('Inscrição não encontrada');
+      }
+
+      const enrollment = enrollmentSnap.data() as Enrollment;
+
+      // Only confirm if pending
+      if (enrollment.status === 'pending') {
+        await updateDoc(enrollmentRef, {
+          status: 'confirmed',
+          updatedAt: serverTimestamp(),
+          'paymentInfo.paymentStatus': 'paid',
+          'paymentInfo.paymentDate': serverTimestamp(),
+        });
+
+        // Notify instructor
+        await notificationService.createNotification({
+          type: 'enrollment',
+          userId: enrollment.instructorId,
+          title: 'Matrícula Confirmada',
+          message: `${enrollment.studentName} confirmou a matrícula em ${enrollment.activityName}`,
+          data: {
+            enrollmentId: id,
+            activityId: enrollment.activityId,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao confirmar inscrição:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancela uma inscrição
+   */
+  async cancelEnrollment(id: string): Promise<void> {
+    try {
+      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
+      const enrollmentSnap = await getDoc(enrollmentRef);
+
+      if (!enrollmentSnap.exists()) {
+        throw new Error('Inscrição não encontrada');
+      }
+
+      const enrollment = enrollmentSnap.data() as Enrollment;
+
       await updateDoc(enrollmentRef, {
-        ...enrollment,
-        updated: serverTimestamp()
+        status: 'cancelled',
+        updatedAt: serverTimestamp(),
+        'paymentInfo.paymentStatus': 'refunded',
+      });
+
+      // Atualizar contagem de alunos na atividade
+      await activityService.updateEnrolledStudents(enrollment.activityId, -1);
+
+      // Notificar instrutor
+      await notificationService.createNotification({
+        type: 'enrollment',
+        userId: enrollment.instructorId,
+        title: 'Matrícula Cancelada',
+        message: `${enrollment.studentName} cancelou a matrícula em ${enrollment.activityName}`,
+        data: {
+          enrollmentId: id,
+          activityId: enrollment.activityId,
+        },
       });
     } catch (error) {
-      console.error('Erro ao atualizar inscrição:', error);
+      console.error('Erro ao cancelar inscrição:', error);
       throw error;
     }
-  }
-
-  /**
-   * Busca uma inscrição pelo ID
-   */
-  async getEnrollment(id: string): Promise<Enrollment | null> {
-    try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
-      const enrollmentDoc = await getDoc(enrollmentRef);
-
-      if (enrollmentDoc.exists()) {
-        return {
-          id: enrollmentDoc.id,
-          ...enrollmentDoc.data()
-        } as Enrollment;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Erro ao buscar inscrição:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Lista inscrições com filtros
-   */
-  async listEnrollments(filters?: {
-    studentId?: string;
-    instructorId?: string;
-    activityId?: string;
-    status?: EnrollmentStatus;
-  }): Promise<Enrollment[]> {
-    try {
-      let q = collection(db, this.enrollmentsCollection);
-
-      if (filters) {
-        const constraints = [];
-
-        if (filters.studentId) {
-          constraints.push(where('studentId', '==', filters.studentId));
-        }
-
-        if (filters.instructorId) {
-          constraints.push(where('instructorId', '==', filters.instructorId));
-        }
-
-        if (filters.activityId) {
-          constraints.push(where('activityId', '==', filters.activityId));
-        }
-
-        if (filters.status) {
-          constraints.push(where('status', '==', filters.status));
-        }
-
-        q = query(q, ...constraints, orderBy('created', 'desc'));
-      } else {
-        q = query(q, orderBy('created', 'desc'));
-      }
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Enrollment[];
-    } catch (error) {
-      console.error('Erro ao listar inscrições:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Escuta inscrições em tempo real
-   */
-  subscribeToEnrollments(callback: (enrollments: Enrollment[]) => void, filters?: {
-    studentId?: string;
-    instructorId?: string;
-    activityId?: string;
-    status?: EnrollmentStatus;
-  }) {
-    let q = collection(db, this.enrollmentsCollection);
-
-    if (filters) {
-      const constraints = [];
-
-      if (filters.studentId) {
-        constraints.push(where('studentId', '==', filters.studentId));
-      }
-
-      if (filters.instructorId) {
-        constraints.push(where('instructorId', '==', filters.instructorId));
-      }
-
-      if (filters.activityId) {
-        constraints.push(where('activityId', '==', filters.activityId));
-      }
-
-      if (filters.status) {
-        constraints.push(where('status', '==', filters.status));
-      }
-
-      q = query(q, ...constraints, orderBy('created', 'desc'));
-    } else {
-      q = query(q, orderBy('created', 'desc'));
-    }
-
-    return onSnapshot(q, (snapshot) => {
-      const enrollments = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Enrollment[];
-
-      callback(enrollments);
-    });
   }
 
   /**
@@ -215,38 +176,16 @@ class EnrollmentService {
       const q = query(
         collection(db, this.enrollmentsCollection),
         where('studentId', '==', studentId),
-        orderBy('created', 'desc')
+        orderBy('createdAt', 'desc')
       );
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Enrollment[];
     } catch (error) {
       console.error('Erro ao buscar inscrições do aluno:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Busca inscrições de um instrutor
-   */
-  async getInstructorEnrollments(instructorId: string): Promise<Enrollment[]> {
-    try {
-      const q = query(
-        collection(db, this.enrollmentsCollection),
-        where('instructorId', '==', instructorId),
-        orderBy('created', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Enrollment[];
-    } catch (error) {
-      console.error('Erro ao buscar inscrições do instrutor:', error);
       throw error;
     }
   }
@@ -259,13 +198,13 @@ class EnrollmentService {
       const q = query(
         collection(db, this.enrollmentsCollection),
         where('activityId', '==', activityId),
-        orderBy('created', 'desc')
+        orderBy('createdAt', 'desc')
       );
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Enrollment[];
     } catch (error) {
       console.error('Erro ao buscar inscrições da atividade:', error);
@@ -274,360 +213,93 @@ class EnrollmentService {
   }
 
   /**
-   * Atualiza status da inscrição
+   * Lista todas as inscrições com filtros opcionais
    */
-  async updateEnrollmentStatus(id: string, status: EnrollmentStatus): Promise<void> {
-    try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
-      await updateDoc(enrollmentRef, {
-        status,
-        updated: serverTimestamp()
-      });
-
-      // Notificar o aluno sobre a mudança de status
-      const enrollment = await this.getEnrollment(id);
-      if (enrollment) {
-        await notificationService.createStatusNotification(
-          enrollment.studentId,
-          enrollment.instructorName,
-          enrollment.activityName,
-          status,
-          id
-        );
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar status da inscrição:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Deleta uma inscrição
-   */
-  async deleteEnrollment(id: string): Promise<void> {
-    try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
-      await enrollmentRef.delete();
-    } catch (error) {
-      console.error('Erro ao deletar inscrição:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Registra uma nova transação financeira
-   */
-  async createTransaction(transactionData: Omit<Transaction, 'id' | 'createdAt'>): Promise<string> {
-    try {
-      const transactionRef = await addDoc(collection(db, this.transactionsCollection), {
-        ...transactionData,
-        createdAt: Timestamp.now()
-      });
-
-      return transactionRef.id;
-    } catch (error) {
-      console.error('Erro ao criar transação:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Atualiza informações de presença
-   */
-  async updateAttendance(
-    enrollmentId: string,
-    attendance: { present: boolean; date: Date | string; notes?: string }
-  ): Promise<void> {
-    try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, enrollmentId);
-      const enrollmentSnap = await getDoc(enrollmentRef);
-
-      if (!enrollmentSnap.exists()) {
-        throw new Error('Matrícula não encontrada');
-      }
-
-      const currentAttendance = enrollmentSnap.data().attendance || [];
-
-      await updateDoc(enrollmentRef, {
-        attendance: [...currentAttendance, attendance],
-        updated: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('Erro ao atualizar presença:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Observa matrículas em tempo real para um instrutor com tratamento de erros
-   */
-  subscribeToInstructorEnrollments(
-    instructorId: string,
-    onUpdate: (enrollments: Enrollment[]) => void
-  ) {
-    try {
-      const q = query(
-        collection(db, this.enrollmentsCollection),
-        where('instructorId', '==', instructorId),
-        orderBy('created', 'desc')
-      );
-
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const enrollments: Enrollment[] = [];
-          snapshot.forEach((doc) => {
-            enrollments.push({
-              id: doc.id,
-              ...doc.data()
-            } as Enrollment);
-          });
-          onUpdate(enrollments);
-        },
-        (error) => {
-          console.error('Error in enrollment subscription:', error);
-          // Return empty array on error to prevent UI from breaking
-          onUpdate([]);
-        }
-      );
-
-      return unsubscribe;
-    } catch (error) {
-      console.error('Error setting up enrollment subscription:', error);
-      // Return a no-op unsubscribe function
-      return () => {};
-    }
-  }
-
-  /**
-   * Calcula resumo financeiro do instrutor
-   */
-  async getInstructorFinancialSummary(instructorId: string): Promise<InstructorFinancialSummary> {
-    try {
-      // Buscar todas as matrículas pagas do instrutor
-      const paidEnrollmentsQuery = query(
-        collection(db, this.enrollmentsCollection),
-        where('instructorId', '==', instructorId),
-        where('paymentInfo.paymentStatus', '==', 'paid')
-      );
-
-      // Buscar matrículas pendentes
-      const pendingEnrollmentsQuery = query(
-        collection(db, this.enrollmentsCollection),
-        where('instructorId', '==', instructorId),
-        where('paymentInfo.paymentStatus', '==', 'pending')
-      );
-
-      const [paidSnapshot, pendingSnapshot] = await Promise.all([
-        getDocs(paidEnrollmentsQuery),
-        getDocs(pendingEnrollmentsQuery)
-      ]);
-
-      const summary: InstructorFinancialSummary = {
-        totalEarnings: 0,
-        pendingAmount: 0,
-        periodEarnings: [],
-        commissionRate: 0.15,
-      };
-
-      // Calcular ganhos totais e por período
-      const periodMap = new Map<string, { amount: number; enrollments: number }>();
-
-      paidSnapshot.forEach(doc => {
-        const enrollment = doc.data() as Enrollment;
-        summary.totalEarnings += enrollment.paymentInfo.instructorAmount;
-
-        // Agrupar por mês
-        const date = new Date(enrollment.paymentInfo.paymentDate);
-        const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-        const periodData = periodMap.get(period) || { amount: 0, enrollments: 0 };
-        periodData.amount += enrollment.paymentInfo.instructorAmount;
-        periodData.enrollments += 1;
-        periodMap.set(period, periodData);
-      });
-
-      // Calcular valor pendente
-      pendingSnapshot.forEach(doc => {
-        const enrollment = doc.data() as Enrollment;
-        summary.pendingAmount += enrollment.paymentInfo.instructorAmount;
-      });
-
-      // Converter mapa de períodos para array
-      summary.periodEarnings = Array.from(periodMap.entries())
-        .map(([period, data]) => ({
-          period,
-          amount: data.amount,
-          enrollments: data.enrollments
-        }))
-        .sort((a, b) => b.period.localeCompare(a.period));
-
-      // Adicionar próximo pagamento se houver valor pendente
-      if (summary.pendingAmount > 0) {
-        const nextPayoutDate = new Date();
-        nextPayoutDate.setDate(nextPayoutDate.getDate() + 7); // Pagamento em 7 dias
-
-        summary.nextPayout = {
-          amount: summary.pendingAmount,
-          estimatedDate: nextPayoutDate
-        };
-      }
-
-      return summary;
-    } catch (error) {
-      console.error('Erro ao calcular resumo financeiro:', error);
-      throw error;
-    }
-  }
-
-  // Atualizar uma matrícula
-  async updateEnrollment(id: string, enrollment: Partial<Enrollment>) {
-    try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
-      const enrollmentDoc = await getDoc(enrollmentRef);
-
-      if (enrollmentDoc.exists()) {
-        const currentEnrollment = enrollmentDoc.data() as Enrollment;
-
-        // Se o status mudou para cancelado, atualizar contagem de alunos
-        if (enrollment.status === 'cancelled' && currentEnrollment.status !== 'cancelled') {
-          await activityService.updateEnrolledStudents(currentEnrollment.activityId, -1);
-        }
-
-        // Atualizar a matrícula
-        await updateDoc(enrollmentRef, {
-          ...enrollment,
-          updated: serverTimestamp()
-        });
-
-        // Notificar o instrutor sobre a atualização
-        if (enrollment.status) {
-          await notificationService.createEnrollmentNotification(
-            currentEnrollment.instructorId,
-            currentEnrollment.studentName,
-            currentEnrollment.activityName,
-            id
-          );
-        }
-
-        // Criar notificação para o aluno sobre a mudança de status
-        if (enrollment.status && enrollment.status !== currentEnrollment.status) {
-          await notificationService.createEnrollmentStatusNotification(
-            currentEnrollment.studentId,
-            currentEnrollment.activityName,
-            enrollment.status,
-            id
-          );
-        }
-
-        // Criar notificação para o aluno sobre a mudança de status de pagamento
-        if (enrollment.paymentInfo?.paymentStatus &&
-            enrollment.paymentInfo.paymentStatus !== currentEnrollment.paymentInfo.paymentStatus) {
-          await notificationService.createPaymentNotification(
-            currentEnrollment.studentId,
-            currentEnrollment.paymentInfo.amount,
-            enrollment.paymentInfo.paymentStatus,
-            id
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar matrícula:', error);
-      throw error;
-    }
-  }
-
-  // Excluir uma matrícula
-  async deleteEnrollment(id: string) {
-    try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
-      const enrollmentDoc = await getDoc(enrollmentRef);
-
-      if (enrollmentDoc.exists()) {
-        const enrollment = enrollmentDoc.data() as Enrollment;
-
-        // Atualizar contagem de alunos na atividade
-        if (enrollment.status !== 'cancelled') {
-          await activityService.updateEnrolledStudents(enrollment.activityId, -1);
-        }
-
-        await deleteDoc(enrollmentRef);
-      }
-    } catch (error) {
-      console.error('Erro ao excluir matrícula:', error);
-      throw error;
-    }
-  }
-
-  // Listar matrículas
   async listEnrollments(filters?: {
-    activityId?: string;
     studentId?: string;
     instructorId?: string;
-    status?: Enrollment['status'];
-  }) {
+    activityId?: string;
+    status?: 'pending' | 'confirmed' | 'cancelled';
+  }): Promise<Enrollment[]> {
     try {
-      let q = collection(db, this.enrollmentsCollection);
+      const constraints: any[] = [];
 
-      if (filters) {
-        const constraints = [];
-
-        if (filters.activityId) {
-          constraints.push(where('activityId', '==', filters.activityId));
-        }
-
-        if (filters.studentId) {
-          constraints.push(where('studentId', '==', filters.studentId));
-        }
-
-        if (filters.instructorId) {
-          constraints.push(where('instructorId', '==', filters.instructorId));
-        }
-
-        if (filters.status) {
-          constraints.push(where('status', '==', filters.status));
-        }
-
-        q = query(q, ...constraints, orderBy('created', 'desc'));
-      } else {
-        q = query(q, orderBy('created', 'desc'));
+      if (filters?.studentId) {
+        constraints.push(where('studentId', '==', filters.studentId));
       }
+
+      if (filters?.instructorId) {
+        constraints.push(where('instructorId', '==', filters.instructorId));
+      }
+
+      if (filters?.activityId) {
+        constraints.push(where('activityId', '==', filters.activityId));
+      }
+
+      if (filters?.status) {
+        constraints.push(where('status', '==', filters.status));
+      }
+
+      const q = query(
+        collection(db, this.enrollmentsCollection),
+        ...constraints,
+        orderBy('createdAt', 'desc')
+      );
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        created: doc.data().created.toDate(),
-        updated: doc.data().updated.toDate(),
-        paymentDate: doc.data().paymentInfo?.paymentDate?.toDate()
       })) as Enrollment[];
     } catch (error) {
-      console.error('Erro ao listar matrículas:', error);
+      console.error('Erro ao listar inscrições:', error);
       throw error;
     }
   }
 
-  // Atualizar status de pagamento
-  async updatePaymentStatus(id: string, paymentStatus: Enrollment['paymentStatus']) {
-    try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
-      await updateDoc(enrollmentRef, {
-        paymentStatus,
-        paymentDate: paymentStatus === 'paid' ? Timestamp.now() : null,
-        updated: Timestamp.now()
-      });
-
-      // Criar notificação para o aluno sobre a mudança de status de pagamento
-      await notificationService.createPaymentNotification(
-        enrollmentRef.data().studentId,
-        enrollmentRef.data().paymentInfo.amount,
-        paymentStatus,
-        id
-      );
-    } catch (error) {
-      console.error('Erro ao atualizar status de pagamento:', error);
-      throw error;
+  /**
+   * Escuta inscrições em tempo real
+   */
+  subscribeToEnrollments(
+    callback: (enrollments: Enrollment[]) => void,
+    filters?: {
+      studentId?: string;
+      instructorId?: string;
+      activityId?: string;
+      status?: 'pending' | 'confirmed' | 'cancelled';
     }
+  ) {
+    const constraints: any[] = [];
+
+    if (filters?.studentId) {
+      constraints.push(where('studentId', '==', filters.studentId));
+    }
+
+    if (filters?.instructorId) {
+      constraints.push(where('instructorId', '==', filters.instructorId));
+    }
+
+    if (filters?.activityId) {
+      constraints.push(where('activityId', '==', filters.activityId));
+    }
+
+    if (filters?.status) {
+      constraints.push(where('status', '==', filters.status));
+    }
+
+    const q = query(
+      collection(db, this.enrollmentsCollection),
+      ...constraints,
+      orderBy('createdAt', 'desc')
+    );
+
+    return onSnapshot(q, snapshot => {
+      const enrollments = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Enrollment[];
+      callback(enrollments);
+    });
   }
 }
 

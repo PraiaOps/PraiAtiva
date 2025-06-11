@@ -1,5 +1,10 @@
 // Tipos de Usuários
-export type UserRole = 'student' | 'instructor' | 'admin';
+export type UserRole =
+  | 'student'
+  | 'instructor'
+  | 'admin'
+  | 'practitioner'
+  | 'entrepreneur';
 
 export interface User {
   id: string;
@@ -11,8 +16,8 @@ export interface User {
   photoURL?: string;
   bio?: string;
   location?: string;
-  created: Date;
-  updated: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Tipo para Praticante (usuário que busca atividades)
@@ -78,7 +83,14 @@ export interface Activity {
   instructorId: string;
   instructorName: string;
   name: string;
-  type: 'sports' | 'leisure' | 'tourism' | 'wellness' | 'education' | 'cultura' | 'lazer';
+  type:
+    | 'sports'
+    | 'leisure'
+    | 'tourism'
+    | 'wellness'
+    | 'education'
+    | 'cultura'
+    | 'lazer';
   beach: string;
   city: string;
   price: number;
@@ -96,8 +108,10 @@ export interface Activity {
   }[];
   status: ActivityStatus;
   enrolledStudents: number;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date;
+  updatedAt: Date;
+  rating: number;
+  reviews: number;
 }
 
 // Tipo para Tipo de Atividade
@@ -171,7 +185,11 @@ export interface Credential {
 }
 
 // Tipo para Status de Matrícula
-export type EnrollmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
+export type EnrollmentStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'cancelled'
+  | 'completed';
 
 // Tipo para Status de Pagamento
 export type PaymentStatus = 'pending' | 'paid' | 'refunded';
@@ -194,8 +212,25 @@ export interface Enrollment {
     paymentStatus: PaymentStatus;
     paymentDate: Date;
   };
-  created: Date;
-  updated: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Tipo para Pagamento
+export interface Payment {
+  id: string;
+  studentId: string;
+  instructorId: string;
+  activityId: string;
+  enrollmentId: string;
+  studentName: string;
+  activityName: string;
+  amount: number;
+  paymentMethod: 'pix' | 'credit_card';
+  status: PaymentStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  paidAt?: Date;
 }
 
 // Tipo para Transação Financeira
@@ -231,21 +266,6 @@ export interface InstructorFinancialSummary {
   };
 }
 
-export interface Payment {
-  id: string;
-  studentId: string;
-  instructorId: string;
-  activityId: string;
-  enrollmentId: string;
-  studentName: string;
-  instructorName: string;
-  activityName: string;
-  amount: number;
-  status: PaymentStatus;
-  created: Date;
-  updated: Date;
-}
-
 export interface Rating {
   id: string;
   studentId: string;
@@ -256,8 +276,8 @@ export interface Rating {
   activityName: string;
   rating: number;
   comment?: string;
-  created: Date;
-  updated: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Chat {
@@ -267,10 +287,10 @@ export interface Chat {
     text: string;
     senderId: string;
     senderName: string;
-    created: Date;
+    createdAt: Date;
   };
-  created: Date;
-  updated: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Message {
@@ -281,18 +301,27 @@ export interface Message {
   senderName: string;
   text: string;
   read: boolean;
-  created: Date;
-  updated: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
+
+export type NotificationType =
+  | 'enrollment'
+  | 'activity'
+  | 'payment'
+  | 'system'
+  | 'status'
+  | 'message'
+  | 'rating';
 
 export interface Notification {
   id: string;
   userId: string;
-  type: 'enrollment' | 'activity' | 'payment' | 'system' | 'status' | 'message' | 'rating';
+  type: NotificationType;
   title: string;
   message: string;
   data?: Record<string, any>;
   read: boolean;
-  created: Date;
-  updated: Date;
+  createdAt: Date | { seconds: number; nanoseconds: number };
+  updatedAt?: Date | { seconds: number; nanoseconds: number };
 }

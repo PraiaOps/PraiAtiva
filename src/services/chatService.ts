@@ -1,5 +1,5 @@
 import { db } from '@/config/firebase';
-import { 
+import {
   collection,
   doc,
   getDoc,
@@ -11,8 +11,9 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
-  limit,
-  startAfter
+  limit as firestoreLimit,
+  startAfter,
+  writeBatch,
 } from 'firebase/firestore';
 import { Chat, Message } from '@/types';
 import { notificationService } from './notificationService';
@@ -28,9 +29,9 @@ class ChatService {
     try {
       const chatRef = await addDoc(collection(db, this.chatsCollection), {
         ...chat,
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
-        lastMessage: null
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastMessage: null,
       });
 
       return chatRef.id;
@@ -51,9 +52,9 @@ class ChatService {
       const messageRef = await addDoc(collection(db, this.messagesCollection), {
         ...message,
         chatId,
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
-        read: false
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        read: false,
       });
 
       // Atualizar última mensagem do chat
@@ -63,9 +64,9 @@ class ChatService {
           text: message.text,
           senderId: message.senderId,
           senderName: message.senderName,
-          created: serverTimestamp()
+          createdAt: serverTimestamp(),
         },
-        updated: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
 
       // Notificar o destinatário
@@ -96,8 +97,8 @@ class ChatService {
       );
 
       const snapshot = await getDocs(q);
-      
-      const batch = db.batch();
+
+      const batch = writeBatch(db);
       snapshot.docs.forEach(doc => {
         batch.update(doc.ref, { read: true });
       });
@@ -116,14 +117,14 @@ class ChatService {
     try {
       const chatRef = doc(db, this.chatsCollection, id);
       const chatDoc = await getDoc(chatRef);
-      
+
       if (chatDoc.exists()) {
         return {
           id: chatDoc.id,
-          ...chatDoc.data()
+          ...chatDoc.data(),
         } as Chat;
       }
-      
+
       return null;
     } catch (error) {
       console.error('Erro ao buscar chat:', error);
@@ -139,13 +140,13 @@ class ChatService {
       const q = query(
         collection(db, this.chatsCollection),
         where('participants', 'array-contains', userId),
-        orderBy('updated', 'desc')
+        orderBy('updatedAt', 'desc')
       );
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Chat[];
     } catch (error) {
       console.error('Erro ao listar chats:', error);
@@ -159,25 +160,27 @@ class ChatService {
   async listChatMessages(
     chatId: string,
     lastMessageId?: string,
-    limit: number = 20
+    pageSize: number = 20
   ): Promise<Message[]> {
     try {
       let q = query(
         collection(db, this.messagesCollection),
         where('chatId', '==', chatId),
-        orderBy('created', 'desc'),
-        limit(limit)
+        orderBy('createdAt', 'desc'),
+        firestoreLimit(pageSize)
       );
 
       if (lastMessageId) {
-        const lastMessageDoc = await getDoc(doc(db, this.messagesCollection, lastMessageId));
+        const lastMessageDoc = await getDoc(
+          doc(db, this.messagesCollection, lastMessageId)
+        );
         q = query(q, startAfter(lastMessageDoc));
       }
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
+        ...doc.data(),
         id: doc.id,
-        ...doc.data()
       })) as Message[];
     } catch (error) {
       console.error('Erro ao listar mensagens:', error);
@@ -192,15 +195,15 @@ class ChatService {
     const q = query(
       collection(db, this.chatsCollection),
       where('participants', 'array-contains', userId),
-      orderBy('updated', 'desc')
+      orderBy('updatedAt', 'desc')
     );
 
-    return onSnapshot(q, (snapshot) => {
+    return onSnapshot(q, snapshot => {
       const chats = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Chat[];
-      
+
       callback(chats);
     });
   }
@@ -212,15 +215,15 @@ class ChatService {
     const q = query(
       collection(db, this.messagesCollection),
       where('chatId', '==', chatId),
-      orderBy('created', 'desc')
+      orderBy('createdAt', 'desc')
     );
 
-    return onSnapshot(q, (snapshot) => {
+    return onSnapshot(q, snapshot => {
       const messages = snapshot.docs.map(doc => ({
+        ...doc.data(),
         id: doc.id,
-        ...doc.data()
       })) as Message[];
-      
+
       callback(messages);
     });
   }
@@ -228,7 +231,10 @@ class ChatService {
   /**
    * Busca chat entre dois usuários
    */
-  async getChatBetweenUsers(userId1: string, userId2: string): Promise<Chat | null> {
+  async getChatBetweenUsers(
+    userId1: string,
+    userId2: string
+  ): Promise<Chat | null> {
     try {
       const q = query(
         collection(db, this.chatsCollection),
@@ -236,17 +242,17 @@ class ChatService {
       );
 
       const snapshot = await getDocs(q);
-      
+
       for (const doc of snapshot.docs) {
         const chat = doc.data() as Chat;
         if (chat.participants.includes(userId2)) {
           return {
             id: doc.id,
-            ...chat
+            ...chat,
           };
         }
       }
-      
+
       return null;
     } catch (error) {
       console.error('Erro ao buscar chat entre usuários:', error);
@@ -266,8 +272,8 @@ class ChatService {
       );
 
       const messagesSnapshot = await getDocs(messagesQuery);
-      
-      const batch = db.batch();
+
+      const batch = writeBatch(db);
       messagesSnapshot.docs.forEach(doc => {
         batch.delete(doc.ref);
       });
@@ -283,4 +289,4 @@ class ChatService {
   }
 }
 
-export const chatService = new ChatService(); 
+export const chatService = new ChatService();

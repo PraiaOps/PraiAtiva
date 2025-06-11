@@ -17,26 +17,48 @@ import {
   limit,
   startAfter,
   writeBatch,
-  setDoc
+  setDoc,
 } from 'firebase/firestore';
 import { notificationService } from './notificationService';
 import { Activity, ActivityType, ActivityStatus } from '../types';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 class ActivityService {
   private activitiesCollection = 'activities';
+  private functions = getFunctions();
 
   /**
    * Cria uma nova atividade
    */
   async createActivity(activity: Omit<Activity, 'id'>): Promise<string> {
     try {
-      const activityRef = await addDoc(collection(db, this.activitiesCollection), {
-        ...activity,
-        price: Number(activity.price),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        status: 'active'
-      });
+      // Garante que horarios é um array e tem as propriedades necessárias
+      const horarios = Array.isArray(activity.horarios)
+        ? activity.horarios
+        : [];
+      const validatedHorarios = horarios.map(h => ({
+        periodo: h.periodo || '',
+        horario: h.horario || '',
+        local: h.local || 'areia',
+        limiteAlunos: h.limiteAlunos || 0,
+        alunosMatriculados: h.alunosMatriculados || 0,
+        diaSemana: h.diaSemana || '',
+      }));
+
+      const activityRef = await addDoc(
+        collection(db, this.activitiesCollection),
+        {
+          ...activity,
+          horarios: validatedHorarios,
+          price: Number(activity.price),
+          enrolledStudents: 0,
+          rating: 0,
+          reviews: 0,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          status: 'active' as ActivityStatus,
+        }
+      );
 
       return activityRef.id;
     } catch (error) {
@@ -53,7 +75,7 @@ class ActivityService {
       const activityRef = doc(db, this.activitiesCollection, id);
       const updateData = {
         ...activity,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       };
 
       if (activity.price !== undefined) {
@@ -66,19 +88,35 @@ class ActivityService {
       throw error;
     }
   }
-
   /**
    * Atualiza o número de alunos matriculados
    */
-  async updateEnrolledStudents(activityId: string, incrementValue: number): Promise<void> {
+  async updateEnrolledStudents(
+    activityId: string,
+    delta: number
+  ): Promise<void> {
     try {
       const activityRef = doc(db, this.activitiesCollection, activityId);
-      await updateDoc(activityRef, {
-        enrolledStudents: increment(incrementValue)
+      const activityDoc = await getDoc(activityRef);
+
+      if (!activityDoc.exists()) {
+        throw new Error('Atividade não encontrada');
+      }
+
+      const activity = activityDoc.data() as Activity;
+      const batch = writeBatch(db);
+
+      // Atualiza a contagem geral da atividade
+      batch.update(activityRef, {
+        currentParticipants: increment(delta),
+        updatedAt: serverTimestamp(),
       });
+
+      await batch.commit();
     } catch (error) {
       console.error('Erro ao atualizar número de alunos:', error);
-      throw error;
+      // Continue mesmo se houver erro, já que o número de alunos pode ser atualizado depois
+      // throw error;
     }
   }
 
@@ -91,9 +129,26 @@ class ActivityService {
       const activityDoc = await getDoc(activityRef);
 
       if (activityDoc.exists()) {
+        const data = activityDoc.data();
+
+        // Ensure horarios is always an array with valid data
+        const horarios = Array.isArray(data.horarios) ? data.horarios : [];
+        const validatedHorarios = horarios.map(h => ({
+          periodo: h.periodo || '',
+          horario: h.horario || '',
+          local: h.local || 'areia',
+          limiteAlunos: h.limiteAlunos || 0,
+          alunosMatriculados: h.alunosMatriculados || 0,
+          diaSemana: h.diaSemana || '',
+        }));
+
         return {
           id: activityDoc.id,
-          ...activityDoc.data()
+          ...data,
+          horarios: validatedHorarios,
+          price: Number(data.price || 0),
+          rating: Number(data.rating || 0),
+          reviews: Number(data.reviews || 0),
         } as Activity;
       }
 
@@ -145,7 +200,11 @@ class ActivityService {
         constraints.push(where('price', '<=', filters.price.max));
       }
 
-      const q = query(activitiesRef, ...constraints, orderBy('createdAt', 'desc'));
+      const q = query(
+        activitiesRef,
+        ...constraints,
+        orderBy('createdAt', 'desc')
+      );
 
       const snapshot = await getDocs(q);
       const activities = snapshot.docs.map(doc => ({
@@ -154,10 +213,14 @@ class ActivityService {
         price: Number(doc.data().price),
         status: doc.data().status || 'active',
         instructorId: doc.data().instructorId || 'system',
-        instructorName: doc.data().instructorName || doc.data().entrepreneur || 'Sistema'
+        instructorName:
+          doc.data().instructorName || doc.data().entrepreneur || 'Sistema',
       })) as Activity[];
 
-      console.log('Atividades carregadas:', activities.map(a => ({ id: a.id, name: a.name })));
+      console.log(
+        'Atividades carregadas:',
+        activities.map(a => ({ id: a.id, name: a.name }))
+      );
       return activities;
     } catch (error) {
       console.error('Erro ao listar atividades:', error);
@@ -168,16 +231,19 @@ class ActivityService {
   /**
    * Escuta atividades em tempo real
    */
-  subscribeToActivities(callback: (activities: Activity[]) => void, filters?: {
-    instructorId?: string;
-    status?: ActivityStatus;
-    category?: string;
-    location?: string;
-    price?: {
-      min?: number;
-      max?: number;
-    };
-  }) {
+  subscribeToActivities(
+    callback: (activities: Activity[]) => void,
+    filters?: {
+      instructorId?: string;
+      status?: ActivityStatus;
+      category?: string;
+      location?: string;
+      price?: {
+        min?: number;
+        max?: number;
+      };
+    }
+  ) {
     const activitiesRef = collection(db, this.activitiesCollection);
     const constraints = [];
 
@@ -205,16 +271,21 @@ class ActivityService {
       constraints.push(where('price', '<=', filters.price.max));
     }
 
-    const q = query(activitiesRef, ...constraints, orderBy('createdAt', 'desc'));
+    const q = query(
+      activitiesRef,
+      ...constraints,
+      orderBy('createdAt', 'desc')
+    );
 
-    return onSnapshot(q, (snapshot) => {
+    return onSnapshot(q, snapshot => {
       const activities = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         price: Number(doc.data().price),
         status: doc.data().status || 'active',
         instructorId: doc.data().instructorId || 'system',
-        instructorName: doc.data().instructorName || doc.data().entrepreneur || 'Sistema'
+        instructorName:
+          doc.data().instructorName || doc.data().entrepreneur || 'Sistema',
       })) as Activity[];
 
       callback(activities);
@@ -235,7 +306,7 @@ class ActivityService {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Activity[];
     } catch (error) {
       console.error('Erro ao buscar atividades do instrutor:', error);
@@ -258,7 +329,7 @@ class ActivityService {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Activity[];
     } catch (error) {
       console.error('Erro ao buscar atividades por categoria:', error);
@@ -281,7 +352,7 @@ class ActivityService {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Activity[];
     } catch (error) {
       console.error('Erro ao buscar atividades por localização:', error);
@@ -292,12 +363,15 @@ class ActivityService {
   /**
    * Atualiza status da atividade
    */
-  async updateActivityStatus(id: string, status: ActivityStatus): Promise<void> {
+  async updateActivityStatus(
+    id: string,
+    status: ActivityStatus
+  ): Promise<void> {
     try {
       const activityRef = doc(db, this.activitiesCollection, id);
       await updateDoc(activityRef, {
         status,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       });
     } catch (error) {
       console.error('Erro ao atualizar status da atividade:', error);
@@ -333,7 +407,7 @@ class ActivityService {
         batch.update(activityRef, {
           instructorId: 'paulo@hotmail.com',
           instructorName: 'Paulo',
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
         });
       });
 
@@ -360,18 +434,28 @@ class ActivityService {
       const enrollmentRef = doc(collection(db, 'enrollments'));
       await setDoc(enrollmentRef, {
         ...enrollment,
-        id: enrollmentRef.id
+        id: enrollmentRef.id,
       });
 
       // Atualizar contador de alunos matriculados na atividade
-      const activityRef = doc(db, this.activitiesCollection, enrollment.activityId);
-      await updateDoc(activityRef, {
-        enrolledStudents: increment(1)
-      });
+      await this.updateEnrolledStudents(enrollment.activityId, 1);
 
       return enrollmentRef.id;
     } catch (error) {
       console.error('Erro ao criar matrícula:', error);
+      throw error;
+    }
+  }
+
+  async reactivateActivity(activityId: string): Promise<void> {
+    try {
+      const activityRef = doc(db, this.activitiesCollection, activityId);
+      await updateDoc(activityRef, {
+        status: 'active',
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error('Erro ao reativar atividade:', error);
       throw error;
     }
   }

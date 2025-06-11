@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
+import { getFunctions } from 'firebase/functions';
 
 // Configuração do Firebase
 const firebaseConfig = {
@@ -33,6 +34,7 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+export const functions = getFunctions(app);
 
 // Inicializar Analytics apenas no navegador
 export const analytics = typeof window !== 'undefined'

@@ -1,0 +1,1 @@
+// Arquivo removido para evitar duplicidade de Header. Utilize apenas src/components/layout/Header.tsx.

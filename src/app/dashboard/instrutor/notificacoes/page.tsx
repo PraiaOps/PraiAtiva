@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { notificationService } from '@/services/notificationService';
-import { Notification } from '@/services/notificationService';
+import { type Notification } from '@/types';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 export default function NotificacoesPage() {
@@ -27,24 +27,18 @@ export default function NotificacoesPage() {
       unsubscribeNotifications();
     };
   }, [user]);
-
   const handleMarkAsRead = async (id: string) => {
     try {
-      await notificationService.updateNotification(id, { read: true });
+      await notificationService.markAsRead(id);
     } catch (error) {
       console.error('Erro ao marcar notificação como lida:', error);
       setError('Erro ao marcar notificação como lida. Tente novamente.');
     }
   };
-
   const handleMarkAllAsRead = async () => {
     try {
-      const unreadNotifications = notifications.filter(n => !n.read);
-      await Promise.all(
-        unreadNotifications.map(notification =>
-          notificationService.updateNotification(notification.id, { read: true })
-        )
-      );
+      if (!user) return;
+      await notificationService.markAllAsRead(user.uid);
     } catch (error) {
       console.error('Erro ao marcar todas as notificações como lidas:', error);
       setError('Erro ao marcar todas as notificações como lidas. Tente novamente.');
@@ -110,7 +104,11 @@ export default function NotificacoesPage() {
                         {notification.message}
                       </p>
                       <p className="mt-1 text-xs text-gray-400">
-                        {new Date(notification.createdAt).toLocaleString()}
+                        {typeof notification.createdAt === 'object' && 'seconds' in notification.createdAt 
+                          ? new Date(notification.createdAt.seconds * 1000).toLocaleString()
+                          : notification.createdAt instanceof Date 
+                            ? notification.createdAt.toLocaleString()
+                            : ''}
                       </p>
                     </div>
                     {!notification.read && (
