@@ -19,6 +19,12 @@ import {
 
 export default function InstrutorDashboard() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Suspense boundary for initial data loading
+  if (typeof window === 'undefined') {
+    return null; // Return null during server-side rendering
+  }
   const { user, userData } = useAuth();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);

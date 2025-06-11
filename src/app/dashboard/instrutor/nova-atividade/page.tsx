@@ -7,6 +7,11 @@ import ActivityForm from '@/components/dashboard/ActivityForm';
 export default function NovaAtividadePage() {
   const router = useRouter();
   const { user, userData, loading: authLoading } = useAuth();
+  
+  // Prevenir renderização no servidor
+  if (typeof window === 'undefined') {
+    return null;
+  }
 
   // Verificar se o usuário está autenticado e é um instrutor
   if (!authLoading && (!user || !userData?.isInstructor)) {

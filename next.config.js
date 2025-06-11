@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'export',
+  images: {
+    unoptimized: true,
+  },
   // Disable linting during build
   eslint: {
     ignoreDuringBuilds: true,
@@ -29,8 +33,7 @@ const nextConfig = {
   publicRuntimeConfig: {
     firebaseEnabled: true,
     isDevelopment: process.env.NODE_ENV === 'development',
-  },
-  // Configure webpack for Firebase optimization
+  },  // Configure webpack for Firebase optimization
   webpack: (config, { isServer }) => {
     // Optimize client-side Firebase imports
     if (!isServer) {
@@ -39,6 +42,15 @@ const nextConfig = {
         'firebase/app': 'firebase/app',
         'firebase/auth': 'firebase/auth',
         'firebase/firestore': 'firebase/firestore',
+      };
+    }
+    // Adiciona tratamento para módulos do Firebase no servidor
+    if (isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
       };
     }
     return config;
