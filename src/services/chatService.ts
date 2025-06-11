@@ -1,4 +1,4 @@
-import { db } from '@/config/firebase';
+import { getFirebaseInstance } from '@/config/firebase';
 import {
   collection,
   doc,
@@ -19,24 +19,39 @@ import { Chat, Message } from '@/types';
 import { notificationService } from './notificationService';
 
 class ChatService {
+  private get db() {
+    return getFirebaseInstance().db;
+  }
   private chatsCollection = 'chats';
   private messagesCollection = 'messages';
 
   /**
    * Cria um novo chat
    */
-  async createChat(chat: Omit<Chat, 'id'>): Promise<string> {
+  async createChat(participants: string[]): Promise<string> {
     try {
-      const chatRef = await addDoc(collection(db, this.chatsCollection), {
-        ...chat,
+      const chatRef = await addDoc(collection(this.db, this.chatsCollection), {
+        participants,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastMessage: null,
       });
 
+      // Notify participants about new chat
+      for (const participantId of participants) {
+        await notificationService.createNotification({
+          userId: participantId,
+          type: 'message',
+          title: 'Novo chat criado',
+          message: 'Você foi adicionado a uma nova conversa',          data: {
+            chatId: chatRef.id,
+          },
+        });
+      }
+
       return chatRef.id;
     } catch (error) {
-      console.error('Erro ao criar chat:', error);
+      console.error('Error creating chat:', error);
       throw error;
     }
   }
@@ -49,16 +64,14 @@ class ChatService {
     message: Omit<Message, 'id'>
   ): Promise<string> {
     try {
-      const messageRef = await addDoc(collection(db, this.messagesCollection), {
+      const messageRef = await addDoc(collection(this.db, this.messagesCollection), {
         ...message,
         chatId,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        read: false,
       });
 
-      // Atualizar última mensagem do chat
-      const chatRef = doc(db, this.chatsCollection, chatId);
+      // Update chat's last message and timestamp
+      const chatRef = doc(this.db, this.chatsCollection, chatId);
       await updateDoc(chatRef, {
         lastMessage: {
           text: message.text,
@@ -69,17 +82,29 @@ class ChatService {
         updatedAt: serverTimestamp(),
       });
 
-      // Notificar o destinatário
-      await notificationService.createMessageNotification(
-        message.receiverId,
-        message.senderName,
-        message.text,
-        chatId
-      );
+      // Notify other participants
+      const chat = await this.getChat(chatId);
+      if (chat) {
+        const otherParticipants = chat.participants.filter(
+          (p) => p !== message.senderId
+        );
+        for (const participantId of otherParticipants) {
+          await notificationService.createNotification({
+            userId: participantId,
+            type: 'message',
+            title: 'Nova mensagem',
+            message: `${message.senderName} enviou uma mensagem`,
+            data: {              chatId,
+              messageId: messageRef.id,
+              senderId: message.senderId,
+            },
+          });
+        }
+      }
 
       return messageRef.id;
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      console.error('Error sending message:', error);
       throw error;
     }
   }
@@ -90,22 +115,24 @@ class ChatService {
   async markMessagesAsRead(chatId: string, userId: string): Promise<void> {
     try {
       const q = query(
-        collection(db, this.messagesCollection),
+        collection(this.db, this.messagesCollection),
         where('chatId', '==', chatId),
-        where('receiverId', '==', userId),
-        where('read', '==', false)
+        where('readBy', 'not-in', [userId])
       );
 
-      const snapshot = await getDocs(q);
+      const querySnapshot = await getDocs(q);
+      const batch = writeBatch(this.db);
 
-      const batch = writeBatch(db);
-      snapshot.docs.forEach(doc => {
-        batch.update(doc.ref, { read: true });
+      querySnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        batch.update(doc.ref, {
+          readBy: [...(data.readBy || []), userId],
+        });
       });
 
       await batch.commit();
     } catch (error) {
-      console.error('Erro ao marcar mensagens como lidas:', error);
+      console.error('Error marking messages as read:', error);
       throw error;
     }
   }
@@ -115,19 +142,21 @@ class ChatService {
    */
   async getChat(id: string): Promise<Chat | null> {
     try {
-      const chatRef = doc(db, this.chatsCollection, id);
+      const chatRef = doc(this.db, this.chatsCollection, id);
       const chatDoc = await getDoc(chatRef);
-
-      if (chatDoc.exists()) {
-        return {
-          id: chatDoc.id,
-          ...chatDoc.data(),
-        } as Chat;
+      if (!chatDoc.exists()) {
+        return null;
       }
-
-      return null;
+      const data = chatDoc.data();
+      return {
+        id: chatDoc.id,
+        participants: data.participants,
+        lastMessage: data.lastMessage,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+      } as Chat;
     } catch (error) {
-      console.error('Erro ao buscar chat:', error);
+      console.error('Error getting chat:', error);
       throw error;
     }
   }
@@ -135,21 +164,35 @@ class ChatService {
   /**
    * Lista chats de um usuário
    */
-  async listUserChats(userId: string): Promise<Chat[]> {
+  async getChats(userId: string, limit = 20, lastChatId?: string): Promise<Chat[]> {
     try {
-      const q = query(
-        collection(db, this.chatsCollection),
+      let q = query(
+        collection(this.db, this.chatsCollection),
         where('participants', 'array-contains', userId),
-        orderBy('updatedAt', 'desc')
+        orderBy('updatedAt', 'desc'),
+        firestoreLimit(limit)
       );
 
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Chat[];
+      if (lastChatId) {
+        const lastDoc = await getDoc(doc(this.db, this.messagesCollection, lastChatId));
+        if (lastDoc.exists()) {
+          q = query(q, startAfter(lastDoc));
+        }
+      }
+
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          participants: data.participants,
+          lastMessage: data.lastMessage,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as Chat;
+      });
     } catch (error) {
-      console.error('Erro ao listar chats:', error);
+      console.error('Error getting chats:', error);
       throw error;
     }
   }
@@ -157,33 +200,45 @@ class ChatService {
   /**
    * Lista mensagens de um chat
    */
-  async listChatMessages(
+  async getMessages(
     chatId: string,
-    lastMessageId?: string,
-    pageSize: number = 20
+    limit = 50,
+    lastMessageId?: string
   ): Promise<Message[]> {
     try {
       let q = query(
-        collection(db, this.messagesCollection),
+        collection(this.db, this.messagesCollection),
         where('chatId', '==', chatId),
         orderBy('createdAt', 'desc'),
-        firestoreLimit(pageSize)
+        firestoreLimit(limit)
       );
 
       if (lastMessageId) {
-        const lastMessageDoc = await getDoc(
-          doc(db, this.messagesCollection, lastMessageId)
+        const lastDoc = await getDoc(
+          doc(this.db, this.messagesCollection, lastMessageId)
         );
-        q = query(q, startAfter(lastMessageDoc));
+        if (lastDoc.exists()) {
+          q = query(q, startAfter(lastDoc));
+        }
       }
 
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-      })) as Message[];
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          chatId: data.chatId,
+          senderId: data.senderId,
+          receiverId: data.receiverId,
+          senderName: data.senderName,
+          text: data.text,
+          read: data.read,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as Message;
+      });
     } catch (error) {
-      console.error('Erro ao listar mensagens:', error);
+      console.error('Error getting messages:', error);
       throw error;
     }
   }
@@ -191,19 +246,24 @@ class ChatService {
   /**
    * Escuta chats em tempo real
    */
-  subscribeToChats(userId: string, callback: (chats: Chat[]) => void) {
+  watchChats(userId: string, callback: (chats: Chat[]) => void) {
     const q = query(
-      collection(db, this.chatsCollection),
+      collection(this.db, this.chatsCollection),
       where('participants', 'array-contains', userId),
       orderBy('updatedAt', 'desc')
     );
 
-    return onSnapshot(q, snapshot => {
-      const chats = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Chat[];
-
+    return onSnapshot(q, (snapshot) => {
+      const chats = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          participants: data.participants,
+          lastMessage: data.lastMessage,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as Chat;
+      });
       callback(chats);
     });
   }
@@ -211,53 +271,30 @@ class ChatService {
   /**
    * Escuta mensagens em tempo real
    */
-  subscribeToMessages(chatId: string, callback: (messages: Message[]) => void) {
+  watchMessages(chatId: string, callback: (messages: Message[]) => void) {
     const q = query(
-      collection(db, this.messagesCollection),
+      collection(this.db, this.messagesCollection),
       where('chatId', '==', chatId),
       orderBy('createdAt', 'desc')
     );
 
-    return onSnapshot(q, snapshot => {
-      const messages = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-      })) as Message[];
-
+    return onSnapshot(q, (snapshot) => {
+      const messages = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          chatId: data.chatId,
+          senderId: data.senderId,
+          receiverId: data.receiverId,
+          senderName: data.senderName,
+          text: data.text,
+          read: data.read,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as Message;
+      });
       callback(messages);
     });
-  }
-
-  /**
-   * Busca chat entre dois usuários
-   */
-  async getChatBetweenUsers(
-    userId1: string,
-    userId2: string
-  ): Promise<Chat | null> {
-    try {
-      const q = query(
-        collection(db, this.chatsCollection),
-        where('participants', 'array-contains', userId1)
-      );
-
-      const snapshot = await getDocs(q);
-
-      for (const doc of snapshot.docs) {
-        const chat = doc.data() as Chat;
-        if (chat.participants.includes(userId2)) {
-          return {
-            id: doc.id,
-            ...chat,
-          };
-        }
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Erro ao buscar chat entre usuários:', error);
-      throw error;
-    }
   }
 
   /**
@@ -265,25 +302,22 @@ class ChatService {
    */
   async deleteChat(chatId: string): Promise<void> {
     try {
-      // Deletar todas as mensagens do chat
+      const batch = writeBatch(this.db);
+
+      // Delete messages
       const messagesQuery = query(
-        collection(db, this.messagesCollection),
+        collection(this.db, this.messagesCollection),
         where('chatId', '==', chatId)
       );
-
       const messagesSnapshot = await getDocs(messagesQuery);
+      messagesSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
 
-      const batch = writeBatch(db);
-      messagesSnapshot.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-
-      // Deletar o chat
-      batch.delete(doc(db, this.chatsCollection, chatId));
+      // Delete chat
+      batch.delete(doc(this.db, this.chatsCollection, chatId));
 
       await batch.commit();
     } catch (error) {
-      console.error('Erro ao deletar chat:', error);
+      console.error('Error deleting chat:', error);
       throw error;
     }
   }

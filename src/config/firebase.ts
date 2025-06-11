@@ -1,4 +1,4 @@
-import { getApps, initializeApp, FirebaseApp } from 'firebase/app';
+import { getApps, initializeApp, FirebaseApp, getApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
@@ -16,62 +16,78 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-let app: FirebaseApp | undefined;
-let db: Firestore | undefined;
-let auth: Auth | undefined;
-let storage: FirebaseStorage | undefined;
-let functions: Functions | undefined;
-let analytics: Promise<Analytics | null> | undefined;
+// Singleton instances
+let firebaseApp: FirebaseApp | undefined;
+let firestoreDb: Firestore | undefined;
+let firebaseAuth: Auth | undefined;
+let firebaseStorage: FirebaseStorage | undefined;
+let firebaseFunctions: Functions | undefined;
+let firebaseAnalytics: Analytics | null | undefined;
 
+// Initialize Firebase services
 function initializeFirebase() {
   try {
-    // Check if Firebase is already initialized
-    const apps = getApps();
-    if (apps.length > 0) {
-      app = apps[0];
-    } else {
-      // Verify required environment variables
-      const requiredEnvVars = [
-        'NEXT_PUBLIC_FIREBASE_API_KEY',
-        'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-        'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-      ];
+    if (typeof window === 'undefined') return;
 
-      const missingEnvVars = requiredEnvVars.filter(
-        (envVar) => !process.env[envVar]
-      );
+    // Get existing app or initialize new one
+    firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-      if (missingEnvVars.length > 0) {
-        throw new Error(`Missing Firebase configuration: ${missingEnvVars.join(', ')}`);
-      }
+    // Initialize services only once
+    if (!firestoreDb) firestoreDb = getFirestore(firebaseApp);
+    if (!firebaseAuth) firebaseAuth = getAuth(firebaseApp);
+    if (!firebaseStorage) firebaseStorage = getStorage(firebaseApp);
+    if (!firebaseFunctions) firebaseFunctions = getFunctions(firebaseApp);
 
-      app = initializeApp(firebaseConfig);
-    }
-
-    if (!app) {
-      throw new Error('Failed to initialize Firebase app');
-    }
-
-    // Initialize Firebase services
-    db = getFirestore(app);
-    auth = getAuth(app);
-    storage = getStorage(app);
-    functions = getFunctions(app);
-
-    // Initialize analytics only in the browser
-    if (typeof window !== 'undefined') {
-      analytics = isSupported().then(yes => yes ? getAnalytics(app!) : null);
+    // Initialize Analytics only if supported
+    if (firebaseAnalytics === null) {
+      isSupported()
+        .then((supported) => {
+          if (supported) {
+            firebaseAnalytics = getAnalytics(firebaseApp);
+          } else {
+            firebaseAnalytics = null;
+          }
+        })
+        .catch(() => {
+          firebaseAnalytics = null;
+        });
     }
   } catch (error) {
     console.error('Error initializing Firebase:', error);
-    throw error;
+    throw error; // Re-throw to handle initialization failures
   }
 }
 
-// Initialize Firebase only in the browser
+// Export a function to get Firebase instances
+export function getFirebaseInstance() {
+  if (typeof window !== 'undefined') {
+    if (!firebaseApp) {
+      initializeFirebase();
+    }
+    return {
+      app: firebaseApp!,
+      db: firestoreDb!,
+      auth: firebaseAuth!,
+      storage: firebaseStorage!,
+      functions: firebaseFunctions!,
+      analytics: firebaseAnalytics,
+    };
+  }
+  
+  throw new Error('Firebase can only be used in client-side code.');
+}
+
+// Initialize on import in client-side
 if (typeof window !== 'undefined') {
   initializeFirebase();
 }
 
-export default app;
-export { db, auth, storage, functions, analytics };
+// Export initialized instances
+export { firebaseApp as app };
+export { firestoreDb as db };
+export { firebaseAuth as auth };
+export { firebaseStorage as storage };
+export { firebaseFunctions as functions };
+export { firebaseAnalytics as analytics };
+
+export default firebaseApp;

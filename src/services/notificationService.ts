@@ -1,4 +1,4 @@
-import { db } from '@/config/firebase';
+import { getFirebaseInstance } from '@/config/firebase';
 import {
   collection,
   addDoc,
@@ -20,6 +20,9 @@ import {
 import { EnrollmentStatus, NotificationType, type Notification } from '@/types';
 
 class NotificationService {
+  private get db() {
+    return getFirebaseInstance().db;
+  }
   private notificationsCollection = 'notifications';
 
   /**
@@ -41,7 +44,7 @@ class NotificationService {
       };
 
       const docRef = await addDoc(
-        collection(db, this.notificationsCollection),
+        collection(this.db, this.notificationsCollection),
         notification
       );
       return docRef.id;
@@ -111,7 +114,7 @@ class NotificationService {
   async markAsRead(notificationId: string): Promise<void> {
     try {
       const notificationRef = doc(
-        db,
+        this.db,
         this.notificationsCollection,
         notificationId
       );
@@ -131,13 +134,13 @@ class NotificationService {
   async markAllAsRead(userId: string): Promise<void> {
     try {
       const q = query(
-        collection(db, this.notificationsCollection),
+        collection(this.db, this.notificationsCollection),
         where('userId', '==', userId),
         where('read', '==', false)
       );
 
       const snapshot = await getDocs(q);
-      const batch = writeBatch(db);
+      const batch = writeBatch(this.db);
 
       snapshot.docs.forEach(doc => {
         batch.update(doc.ref, {
@@ -163,7 +166,7 @@ class NotificationService {
   ): Promise<Notification[]> {
     try {
       let q = query(
-        collection(db, this.notificationsCollection),
+        collection(this.db, this.notificationsCollection),
         where('userId', '==', userId),
         orderBy('createdAt', 'desc'),
         limit(pageSize)
@@ -171,7 +174,7 @@ class NotificationService {
 
       if (lastNotificationId) {
         const lastNotificationDoc = await getDoc(
-          doc(db, this.notificationsCollection, lastNotificationId)
+          doc(this.db, this.notificationsCollection, lastNotificationId)
         );
         if (lastNotificationDoc.exists()) {
           q = query(q, startAfter(lastNotificationDoc));
@@ -197,7 +200,7 @@ class NotificationService {
     callback: (notifications: Notification[]) => void
   ) {
     const q = query(
-      collection(db, this.notificationsCollection),
+      collection(this.db, this.notificationsCollection),
       where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     );
@@ -218,7 +221,7 @@ class NotificationService {
   async countUnreadNotifications(userId: string): Promise<number> {
     try {
       const q = query(
-        collection(db, this.notificationsCollection),
+        collection(this.db, this.notificationsCollection),
         where('userId', '==', userId),
         where('read', '==', false)
       );
@@ -237,7 +240,7 @@ class NotificationService {
   async deleteNotification(notificationId: string): Promise<void> {
     try {
       const notificationRef = doc(
-        db,
+        this.db,
         this.notificationsCollection,
         notificationId
       );
@@ -254,12 +257,12 @@ class NotificationService {
   async deleteAllUserNotifications(userId: string): Promise<void> {
     try {
       const q = query(
-        collection(db, this.notificationsCollection),
+        collection(this.db, this.notificationsCollection),
         where('userId', '==', userId)
       );
 
       const snapshot = await getDocs(q);
-      const batch = writeBatch(db);
+      const batch = writeBatch(this.db);
 
       snapshot.docs.forEach(doc => {
         batch.delete(doc.ref);

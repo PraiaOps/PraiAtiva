@@ -1,4 +1,4 @@
-import { db } from '../config/firebase';
+import { getFirebaseInstance } from '../config/firebase';
 import {
   collection,
   addDoc,
@@ -24,6 +24,9 @@ import { Activity, ActivityType, ActivityStatus } from '../types';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 class ActivityService {
+  private get db() {
+    return getFirebaseInstance().db;
+  }
   private activitiesCollection = 'activities';
   private functions = getFunctions();
 
@@ -46,7 +49,7 @@ class ActivityService {
       }));
 
       const activityRef = await addDoc(
-        collection(db, this.activitiesCollection),
+        collection(this.db, this.activitiesCollection),
         {
           ...activity,
           horarios: validatedHorarios,
@@ -72,10 +75,10 @@ class ActivityService {
    */
   async updateActivity(id: string, activity: Partial<Activity>): Promise<void> {
     try {
-      const activityRef = doc(db, this.activitiesCollection, id);
+      const activityRef = doc(this.db, this.activitiesCollection, id);
       const updateData = {
         ...activity,
-        updatedAt: Date.now(),
+        updatedAt: serverTimestamp(),
       };
 
       if (activity.price !== undefined) {
@@ -96,7 +99,7 @@ class ActivityService {
     delta: number
   ): Promise<void> {
     try {
-      const activityRef = doc(db, this.activitiesCollection, activityId);
+      const activityRef = doc(this.db, this.activitiesCollection, activityId);
       const activityDoc = await getDoc(activityRef);
 
       if (!activityDoc.exists()) {
@@ -104,7 +107,7 @@ class ActivityService {
       }
 
       const activity = activityDoc.data() as Activity;
-      const batch = writeBatch(db);
+      const batch = writeBatch(this.db);
 
       // Atualiza a contagem geral da atividade
       batch.update(activityRef, {
@@ -125,7 +128,7 @@ class ActivityService {
    */
   async getActivity(id: string): Promise<Activity | null> {
     try {
-      const activityRef = doc(db, this.activitiesCollection, id);
+      const activityRef = doc(this.db, this.activitiesCollection, id);
       const activityDoc = await getDoc(activityRef);
 
       if (activityDoc.exists()) {
@@ -173,7 +176,7 @@ class ActivityService {
     };
   }): Promise<Activity[]> {
     try {
-      const activitiesRef = collection(db, this.activitiesCollection);
+      const activitiesRef = collection(this.db, this.activitiesCollection);
       const constraints = [];
 
       if (filters?.instructorId) {
@@ -244,7 +247,7 @@ class ActivityService {
       };
     }
   ) {
-    const activitiesRef = collection(db, this.activitiesCollection);
+    const activitiesRef = collection(this.db, this.activitiesCollection);
     const constraints = [];
 
     if (filters?.instructorId) {
@@ -298,7 +301,7 @@ class ActivityService {
   async getInstructorActivities(instructorId: string): Promise<Activity[]> {
     try {
       const q = query(
-        collection(db, this.activitiesCollection),
+        collection(this.db, this.activitiesCollection),
         where('instructorId', '==', instructorId),
         orderBy('createdAt', 'desc')
       );
@@ -320,7 +323,7 @@ class ActivityService {
   async getActivitiesByCategory(category: string): Promise<Activity[]> {
     try {
       const q = query(
-        collection(db, this.activitiesCollection),
+        collection(this.db, this.activitiesCollection),
         where('category', '==', category),
         where('status', '==', 'active'),
         orderBy('createdAt', 'desc')
@@ -343,7 +346,7 @@ class ActivityService {
   async getActivitiesByLocation(location: string): Promise<Activity[]> {
     try {
       const q = query(
-        collection(db, this.activitiesCollection),
+        collection(this.db, this.activitiesCollection),
         where('location', '==', location),
         where('status', '==', 'active'),
         orderBy('createdAt', 'desc')
@@ -368,7 +371,7 @@ class ActivityService {
     status: ActivityStatus
   ): Promise<void> {
     try {
-      const activityRef = doc(db, this.activitiesCollection, id);
+      const activityRef = doc(this.db, this.activitiesCollection, id);
       await updateDoc(activityRef, {
         status,
         updatedAt: Date.now(),
@@ -384,7 +387,7 @@ class ActivityService {
    */
   async deleteActivity(id: string): Promise<void> {
     try {
-      const activityRef = doc(db, this.activitiesCollection, id);
+      const activityRef = doc(this.db, this.activitiesCollection, id);
       await deleteDoc(activityRef);
     } catch (error) {
       console.error('Erro ao deletar atividade:', error);
@@ -397,10 +400,9 @@ class ActivityService {
    */
   async updateExistingActivities() {
     try {
-      const q = query(collection(db, this.activitiesCollection));
+      const q = query(collection(this.db, this.activitiesCollection));
       const snapshot = await getDocs(q);
-
-      const batch = writeBatch(db);
+      const batch = writeBatch(this.db);
 
       snapshot.docs.forEach(doc => {
         const activityRef = doc.ref;
@@ -431,7 +433,7 @@ class ActivityService {
     updatedAt: Date;
   }) {
     try {
-      const enrollmentRef = doc(collection(db, 'enrollments'));
+      const enrollmentRef = doc(collection(this.db, 'enrollments'));
       await setDoc(enrollmentRef, {
         ...enrollment,
         id: enrollmentRef.id,
@@ -449,10 +451,10 @@ class ActivityService {
 
   async reactivateActivity(activityId: string): Promise<void> {
     try {
-      const activityRef = doc(db, this.activitiesCollection, activityId);
+      const activityRef = doc(this.db, this.activitiesCollection, activityId);
       await updateDoc(activityRef, {
         status: 'active',
-        updatedAt: new Date(),
+        updatedAt: serverTimestamp(),
       });
     } catch (error) {
       console.error('Erro ao reativar atividade:', error);

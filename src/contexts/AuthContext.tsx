@@ -10,7 +10,7 @@ import {
   User,
   fetchSignInMethodsForEmail
 } from 'firebase/auth';
-import { auth, db } from '@/config/firebase';
+import { getFirebaseInstance } from '@/config/firebase';
 import { useRouter } from 'next/navigation';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { auth, db } = getFirebaseInstance();
 
   // Carregar dados do usuário do Firestore
   // Função para converter timestamps do Firestore para objetos Date serializáveis

@@ -1,4 +1,4 @@
-import { db } from '@/config/firebase';
+import { getFirebaseInstance } from '@/config/firebase';
 import {
   collection,
   doc,
@@ -19,6 +19,9 @@ import { notificationService } from './notificationService';
 import { activityService } from './activityService';
 
 class EnrollmentService {
+  private get db() {
+    return getFirebaseInstance().db;
+  }
   private enrollmentsCollection = 'enrollments';
 
   private async commitWithRetry(batch: any): Promise<void> {
@@ -43,8 +46,8 @@ class EnrollmentService {
   ): Promise<string> {
     try {
       // Create enrollment document
-      const enrollmentRef = doc(collection(db, this.enrollmentsCollection));
-      const batch = writeBatch(db);
+      const enrollmentRef = doc(collection(this.db, this.enrollmentsCollection));
+      const batch = writeBatch(this.db);
 
       // Add enrollment to batch
       batch.set(enrollmentRef, {
@@ -92,7 +95,7 @@ class EnrollmentService {
    */
   async confirmEnrollment(id: string): Promise<void> {
     try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
+      const enrollmentRef = doc(this.db, this.enrollmentsCollection, id);
       const enrollmentSnap = await getDoc(enrollmentRef);
 
       if (!enrollmentSnap.exists()) {
@@ -133,7 +136,7 @@ class EnrollmentService {
    */
   async cancelEnrollment(id: string): Promise<void> {
     try {
-      const enrollmentRef = doc(db, this.enrollmentsCollection, id);
+      const enrollmentRef = doc(this.db, this.enrollmentsCollection, id);
       const enrollmentSnap = await getDoc(enrollmentRef);
 
       if (!enrollmentSnap.exists()) {
@@ -174,7 +177,7 @@ class EnrollmentService {
   async getStudentEnrollments(studentId: string): Promise<Enrollment[]> {
     try {
       const q = query(
-        collection(db, this.enrollmentsCollection),
+        collection(this.db, this.enrollmentsCollection),
         where('studentId', '==', studentId),
         orderBy('createdAt', 'desc')
       );
@@ -196,7 +199,7 @@ class EnrollmentService {
   async getActivityEnrollments(activityId: string): Promise<Enrollment[]> {
     try {
       const q = query(
-        collection(db, this.enrollmentsCollection),
+        collection(this.db, this.enrollmentsCollection),
         where('activityId', '==', activityId),
         orderBy('createdAt', 'desc')
       );
@@ -241,7 +244,7 @@ class EnrollmentService {
       }
 
       const q = query(
-        collection(db, this.enrollmentsCollection),
+        collection(this.db, this.enrollmentsCollection),
         ...constraints,
         orderBy('createdAt', 'desc')
       );
@@ -288,7 +291,7 @@ class EnrollmentService {
     }
 
     const q = query(
-      collection(db, this.enrollmentsCollection),
+      collection(this.db, this.enrollmentsCollection),
       ...constraints,
       orderBy('createdAt', 'desc')
     );

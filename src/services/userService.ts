@@ -1,4 +1,4 @@
-import { db } from '@/config/firebase';
+import { getFirebaseInstance } from '@/config/firebase';
 import {
   collection,
   doc,
@@ -13,10 +13,14 @@ import {
   serverTimestamp,
   deleteDoc,
   QueryConstraint,
+  limit,
 } from 'firebase/firestore';
 import { User, UserRole } from '@/types';
 
 class UserService {
+  private get db() {
+    return getFirebaseInstance().db;
+  }
   private usersCollection = 'users';
 
   /**
@@ -24,8 +28,9 @@ class UserService {
    */
   async createUser(user: Omit<User, 'id'>): Promise<string> {
     try {
-      const userRef = await addDoc(collection(db, this.usersCollection), {
-        ...user,
+      const { createdAt, updatedAt, ...userData } = user;
+      const userRef = await addDoc(collection(this.db, this.usersCollection), {
+        ...userData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -42,7 +47,7 @@ class UserService {
    */
   async updateUser(id: string, user: Partial<User>): Promise<void> {
     try {
-      const userRef = doc(db, this.usersCollection, id);
+      const userRef = doc(this.db, this.usersCollection, id);
       await updateDoc(userRef, {
         ...user,
         updatedAt: serverTimestamp(),
@@ -58,17 +63,21 @@ class UserService {
    */
   async getUser(id: string): Promise<User | null> {
     try {
-      const userRef = doc(db, this.usersCollection, id);
+      const userRef = doc(this.db, this.usersCollection, id);
       const userDoc = await getDoc(userRef);
 
-      if (userDoc.exists()) {
-        return {
-          id: userDoc.id,
-          ...userDoc.data(),
-        } as User;
+      if (!userDoc.exists()) {
+        return null;
       }
 
-      return null;
+      const data = userDoc.data();
+
+      return {
+        id: userDoc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+      } as User;
     } catch (error) {
       console.error('Erro ao buscar usuário:', error);
       throw error;
@@ -76,112 +85,27 @@ class UserService {
   }
 
   /**
-   * Lista usuários com filtros
-   */
-  async listUsers(filters?: {
-    role?: UserRole;
-    name?: string;
-    email?: string;
-  }): Promise<User[]> {
-    try {
-      const colRef = collection(db, this.usersCollection);
-      let constraints: QueryConstraint[] = [];
-
-      if (filters) {
-        if (filters.role) {
-          constraints.push(where('role', '==', filters.role));
-        }
-
-        if (filters.name) {
-          constraints.push(where('name', '>=', filters.name));
-          constraints.push(where('name', '<=', filters.name + '\uf8ff'));
-        }
-
-        if (filters.email) {
-          constraints.push(where('email', '==', filters.email));
-        }
-
-        constraints.push(orderBy('name'));
-      }
-
-      const q =
-        constraints.length > 0
-          ? query(colRef, ...constraints)
-          : query(colRef, orderBy('name'));
-      const snapshot = await getDocs(q);
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as User[];
-    } catch (error) {
-      console.error('Erro ao listar usuários:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Escuta usuários em tempo real
-   */
-  subscribeToUsers(
-    callback: (users: User[]) => void,
-    filters?: {
-      role?: UserRole;
-      name?: string;
-      email?: string;
-    }
-  ) {
-    let q = collection(db, this.usersCollection);
-
-    if (filters) {
-      const constraints = [];
-
-      if (filters.role) {
-        constraints.push(where('role', '==', filters.role));
-      }
-
-      if (filters.name) {
-        constraints.push(where('name', '>=', filters.name));
-        constraints.push(where('name', '<=', filters.name + '\uf8ff'));
-      }
-
-      if (filters.email) {
-        constraints.push(where('email', '==', filters.email));
-      }
-
-      q = query(q, ...constraints, orderBy('name'));
-    } else {
-      q = query(q, orderBy('name'));
-    }
-
-    return onSnapshot(q, snapshot => {
-      const users = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as User[];
-
-      callback(users);
-    });
-  }
-
-  /**
    * Busca um usuário pelo email
    */
   async getUserByEmail(email: string): Promise<User | null> {
     try {
-      const colRef = collection(db, this.usersCollection);
+      const colRef = collection(this.db, this.usersCollection);
       const q = query(colRef, where('email', '==', email));
-      const snapshot = await getDocs(q);
+      const querySnapshot = await getDocs(q);
 
-      if (!snapshot.empty) {
-        const doc = snapshot.docs[0];
-        return {
-          id: doc.id,
-          ...doc.data(),
-        } as User;
+      if (querySnapshot.empty) {
+        return null;
       }
 
-      return null;
+      const doc = querySnapshot.docs[0];
+      const data = doc.data();
+
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+      } as User;
     } catch (error) {
       console.error('Erro ao buscar usuário por email:', error);
       throw error;
@@ -189,43 +113,96 @@ class UserService {
   }
 
   /**
-   * Lista instrutores
+   * Lista usuários com filtros
    */
-  async listInstructors(): Promise<User[]> {
+  async getUsers(filters?: {
+    role?: UserRole;
+    city?: string;
+    state?: string;
+  }): Promise<User[]> {
     try {
-      const colRef = collection(db, this.usersCollection);
-      const q = query(
-        colRef,
-        where('role', '==', 'instructor'),
-        orderBy('name')
-      );
-      const snapshot = await getDocs(q);
+      const constraints: QueryConstraint[] = [];
 
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as User[];
+      if (filters?.role) {
+        constraints.push(where('role', '==', filters.role));
+      }
+      if (filters?.city) {
+        constraints.push(where('city', '==', filters.city));
+      }
+      if (filters?.state) {
+        constraints.push(where('state', '==', filters.state));
+      }
+
+      const baseQuery = collection(this.db, this.usersCollection);
+      const finalQuery =
+        constraints.length > 0
+          ? query(baseQuery, ...constraints, orderBy('name'))
+          : query(baseQuery, orderBy('name'));
+
+      const querySnapshot = await getDocs(finalQuery);
+      return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as User;
+      });
     } catch (error) {
-      console.error('Erro ao listar instrutores:', error);
+      console.error('Erro ao listar usuários:', error);
       throw error;
     }
   }
 
   /**
-   * Lista alunos
+   * Pesquisa usuários pelo nome
    */
-  async listStudents(): Promise<User[]> {
+  async searchUsersByName(name: string): Promise<User[]> {
     try {
-      const colRef = collection(db, this.usersCollection);
-      const q = query(colRef, where('role', '==', 'student'), orderBy('name'));
-      const snapshot = await getDocs(q);
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as User[];
+      const colRef = collection(this.db, this.usersCollection);
+      const q = query(
+        colRef,
+        where('name', '>=', name),
+        where('name', '<=', name + '\uf8ff'),
+        orderBy('name'),
+        limit(10)
+      );
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as User;
+      });
     } catch (error) {
-      console.error('Erro ao listar alunos:', error);
+      console.error('Erro ao buscar usuários:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Lista usuários por papel
+   */
+  async getUsersByRole(role: UserRole): Promise<User[]> {
+    try {
+      const colRef = collection(this.db, this.usersCollection);
+      const q = query(colRef, where('role', '==', role), orderBy('name'));
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as User;
+      });
+    } catch (error) {
+      console.error('Erro ao listar usuários por papel:', error);
       throw error;
     }
   }
@@ -235,7 +212,7 @@ class UserService {
    */
   async deleteUser(id: string): Promise<void> {
     try {
-      const userRef = doc(db, this.usersCollection, id);
+      const userRef = doc(this.db, this.usersCollection, id);
       await deleteDoc(userRef);
     } catch (error) {
       console.error('Erro ao deletar usuário:', error);
@@ -244,21 +221,20 @@ class UserService {
   }
 
   /**
-   * Escuta mudanças em um usuário
+   * Verifica o papel de um usuário
    */
-  subscribeToUser(userId: string, callback: (user: User | null) => void) {
-    const userRef = doc(db, this.usersCollection, userId);
-
-    return onSnapshot(userRef, doc => {
-      if (doc.exists()) {
-        callback({
-          id: doc.id,
-          ...doc.data(),
-        } as User);
-      } else {
-        callback(null);
+  async verifyUserRole(userId: string, requiredRole: UserRole): Promise<boolean> {
+    try {
+      const userRef = doc(this.db, this.usersCollection, userId);
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) {
+        return false;
       }
-    });
+      return userDoc.data()?.role === requiredRole;
+    } catch (error) {
+      console.error('Erro ao verificar papel do usuário:', error);
+      throw error;
+    }
   }
 }
 
