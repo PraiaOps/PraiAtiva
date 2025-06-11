@@ -1,3 +1,4 @@
+/*
 import { loadStripe } from '@stripe/stripe-js';
 import { db } from '@/config/firebase';
 import { collection, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -21,9 +22,9 @@ class StripeService {
   private paymentsCollection = 'payments';
   private transactionsCollection = 'transactions';
 
-  /**
+  
    * Cria uma sessão de pagamento no Stripe
-   */
+   
   async createPaymentSession(payment: Payment): Promise<string> {
     try {
       const stripe = await getStripe();
@@ -57,9 +58,9 @@ class StripeService {
     }
   }
 
-  /**
+  
    * Processa um pagamento bem-sucedido
-   */
+   
   async handleSuccessfulPayment(paymentId: string, stripeTransactionId: string): Promise<void> {
     try {
       const paymentRef = doc(db, this.paymentsCollection, paymentId);
@@ -89,9 +90,9 @@ class StripeService {
     }
   }
 
-  /**
+  
    * Processa um reembolso
-   */
+  
   async handleRefund(paymentId: string, stripeTransactionId: string): Promise<void> {
     try {
       const paymentRef = doc(db, this.paymentsCollection, paymentId);
@@ -121,9 +122,9 @@ class StripeService {
     }
   }
 
-  /**
+  
    * Cria uma transação no banco de dados
-   */
+   
   private async createTransaction(transaction: Omit<Transaction, 'id'>): Promise<string> {
     try {
       const transactionRef = await collection(db, this.transactionsCollection).add({
@@ -140,3 +141,7 @@ class StripeService {
 }
 
 export const stripeService = new StripeService();
+*/
+
+// Temporariamente exportando um objeto vazio até implementarmos o Stripe
+export const stripeService = {};
