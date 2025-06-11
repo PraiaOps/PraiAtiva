@@ -17,6 +17,12 @@ export default function PaymentPage({ params }: { params: { id: string } }) {
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Prevenir execução no servidor
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
   const [paymentStatus, setPaymentStatus] = useState<
     'pending' | 'processing' | 'completed'
   >('pending');
