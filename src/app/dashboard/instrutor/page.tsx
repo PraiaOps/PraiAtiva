@@ -19,12 +19,6 @@ import {
 
 export default function InstrutorDashboard() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Suspense boundary for initial data loading
-  if (typeof window === 'undefined') {
-    return null; // Return null during server-side rendering
-  }
   const { user, userData } = useAuth();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -36,19 +30,19 @@ export default function InstrutorDashboard() {
   useEffect(() => {
     if (!user) return;
 
-    // Escutar atividades em tempo real
+    // Subscribe to activities in real-time
     const unsubscribeActivities = activityService.subscribeToActivities(
       (activities) => setActivities(activities),
       { instructorId: user.uid }
     );
 
-    // Escutar matrículas em tempo real
+    // Subscribe to enrollments in real-time
     const unsubscribeEnrollments = enrollmentService.subscribeToEnrollments(
       (enrollments) => setEnrollments(enrollments),
       { instructorId: user.uid }
     );
 
-    // Escutar notificações em tempo real
+    // Subscribe to notifications in real-time
     const unsubscribeNotifications = notificationService.subscribeToNotifications(
       user.uid,
       (notifications) => setNotifications(notifications)
@@ -77,7 +71,6 @@ export default function InstrutorDashboard() {
     try {
       setLoading(true);
       await activityService.deleteActivity(id);
-      // Não é necessário atualizar o estado local pois o subscribeToActivities já fará isso
     } catch (error) {
       console.error('Erro ao excluir atividade:', error);
       setError('Erro ao excluir atividade. Tente novamente.');
@@ -88,7 +81,7 @@ export default function InstrutorDashboard() {
 
   const handleConfirmEnrollment = async (id: string) => {
     try {
-      await enrollmentService.updateEnrollment(id, { status: 'confirmed' });
+      await enrollmentService.updateEnrollmentStatus(id, 'confirmed');
     } catch (error) {
       console.error('Erro ao confirmar matrícula:', error);
       setError('Erro ao confirmar matrícula. Tente novamente.');
@@ -99,7 +92,7 @@ export default function InstrutorDashboard() {
     if (!confirm('Tem certeza que deseja cancelar esta matrícula?')) return;
 
     try {
-      await enrollmentService.updateEnrollment(id, { status: 'cancelled' });
+      await enrollmentService.updateEnrollmentStatus(id, 'cancelled');
     } catch (error) {
       console.error('Erro ao cancelar matrícula:', error);
       setError('Erro ao cancelar matrícula. Tente novamente.');
@@ -108,7 +101,7 @@ export default function InstrutorDashboard() {
 
   const handleMarkNotificationAsRead = async (id: string) => {
     try {
-      await notificationService.updateNotification(id, { read: true });
+      await notificationService.markNotificationAsRead(id);
     } catch (error) {
       console.error('Erro ao marcar notificação como lida:', error);
     }

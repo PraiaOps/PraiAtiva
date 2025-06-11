@@ -27,8 +27,6 @@ let firebaseAnalytics: Analytics | null | undefined;
 // Initialize Firebase services
 function initializeFirebase() {
   try {
-    if (typeof window === 'undefined') return;
-
     // Get existing app or initialize new one
     firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
@@ -38,8 +36,8 @@ function initializeFirebase() {
     if (!firebaseStorage) firebaseStorage = getStorage(firebaseApp);
     if (!firebaseFunctions) firebaseFunctions = getFunctions(firebaseApp);
 
-    // Initialize Analytics only if supported
-    if (firebaseAnalytics === null) {
+    // Initialize Analytics only on client-side and if supported
+    if (typeof window !== 'undefined' && firebaseAnalytics === null) {
       isSupported()
         .then((supported) => {
           if (supported) {
@@ -54,33 +52,27 @@ function initializeFirebase() {
     }
   } catch (error) {
     console.error('Error initializing Firebase:', error);
-    throw error; // Re-throw to handle initialization failures
+    throw error;
   }
 }
 
 // Export a function to get Firebase instances
 export function getFirebaseInstance() {
-  if (typeof window !== 'undefined') {
-    if (!firebaseApp) {
-      initializeFirebase();
-    }
-    return {
-      app: firebaseApp!,
-      db: firestoreDb!,
-      auth: firebaseAuth!,
-      storage: firebaseStorage!,
-      functions: firebaseFunctions!,
-      analytics: firebaseAnalytics,
-    };
+  if (!firebaseApp) {
+    initializeFirebase();
   }
-  
-  throw new Error('Firebase can only be used in client-side code.');
+  return {
+    app: firebaseApp!,
+    db: firestoreDb!,
+    auth: firebaseAuth!,
+    storage: firebaseStorage!,
+    functions: firebaseFunctions!,
+    analytics: firebaseAnalytics,
+  };
 }
 
-// Initialize on import in client-side
-if (typeof window !== 'undefined') {
-  initializeFirebase();
-}
+// Initialize on import
+initializeFirebase();
 
 // Export initialized instances
 export { firebaseApp as app };

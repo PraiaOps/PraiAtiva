@@ -35,30 +35,26 @@ class ActivityService {
    */
   async createActivity(activity: Omit<Activity, 'id'>): Promise<string> {
     try {
-      // Garante que horarios é um array e tem as propriedades necessárias
-      const horarios = Array.isArray(activity.horarios)
-        ? activity.horarios
-        : [];
-      const validatedHorarios = horarios.map(h => ({
-        periodo: h.periodo || '',
-        horario: h.horario || '',
-        local: h.local || 'areia',
-        limiteAlunos: h.limiteAlunos || 0,
-        alunosMatriculados: h.alunosMatriculados || 0,
-        diaSemana: h.diaSemana || '',
-      }));
+      // Validar dados da atividade
+      if (!activity.name || !activity.description || !activity.price) {
+        throw new Error('Dados da atividade incompletos');
+      }
 
+      // Garantir que horarios seja um array
+      const horarios = Array.isArray(activity.horarios) ? activity.horarios : [];
+
+      // Criar documento da atividade
       const activityRef = await addDoc(
         collection(this.db, this.activitiesCollection),
         {
           ...activity,
-          horarios: validatedHorarios,
+          horarios,
           price: Number(activity.price),
           enrolledStudents: 0,
           rating: 0,
           reviews: 0,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
           status: 'active' as ActivityStatus,
         }
       );
@@ -76,10 +72,23 @@ class ActivityService {
   async updateActivity(id: string, activity: Partial<Activity>): Promise<void> {
     try {
       const activityRef = doc(this.db, this.activitiesCollection, id);
+      const activityDoc = await getDoc(activityRef);
+
+      if (!activityDoc.exists()) {
+        throw new Error('Atividade não encontrada');
+      }
+
+      // Garantir que horarios seja um array se estiver sendo atualizado
       const updateData = {
         ...activity,
-        updatedAt: serverTimestamp(),
+        updatedAt: Timestamp.now(),
       };
+
+      if (activity.horarios) {
+        updateData.horarios = Array.isArray(activity.horarios) 
+          ? activity.horarios 
+          : [];
+      }
 
       if (activity.price !== undefined) {
         updateData.price = Number(activity.price);
@@ -91,6 +100,7 @@ class ActivityService {
       throw error;
     }
   }
+
   /**
    * Atualiza o número de alunos matriculados
    */
@@ -106,20 +116,20 @@ class ActivityService {
         throw new Error('Atividade não encontrada');
       }
 
-      const activity = activityDoc.data() as Activity;
-      const batch = writeBatch(this.db);
+      const currentEnrolled = activityDoc.data().enrolledStudents || 0;
+      const newEnrolled = currentEnrolled + delta;
 
-      // Atualiza a contagem geral da atividade
-      batch.update(activityRef, {
-        currentParticipants: increment(delta),
-        updatedAt: serverTimestamp(),
+      if (newEnrolled < 0) {
+        throw new Error('Número de alunos não pode ser negativo');
+      }
+
+      await updateDoc(activityRef, {
+        enrolledStudents: newEnrolled,
+        updatedAt: Timestamp.now(),
       });
-
-      await batch.commit();
     } catch (error) {
       console.error('Erro ao atualizar número de alunos:', error);
-      // Continue mesmo se houver erro, já que o número de alunos pode ser atualizado depois
-      // throw error;
+      throw error;
     }
   }
 
@@ -131,31 +141,27 @@ class ActivityService {
       const activityRef = doc(this.db, this.activitiesCollection, id);
       const activityDoc = await getDoc(activityRef);
 
-      if (activityDoc.exists()) {
-        const data = activityDoc.data();
-
-        // Ensure horarios is always an array with valid data
-        const horarios = Array.isArray(data.horarios) ? data.horarios : [];
-        const validatedHorarios = horarios.map(h => ({
-          periodo: h.periodo || '',
-          horario: h.horario || '',
-          local: h.local || 'areia',
-          limiteAlunos: h.limiteAlunos || 0,
-          alunosMatriculados: h.alunosMatriculados || 0,
-          diaSemana: h.diaSemana || '',
-        }));
-
-        return {
-          id: activityDoc.id,
-          ...data,
-          horarios: validatedHorarios,
-          price: Number(data.price || 0),
-          rating: Number(data.rating || 0),
-          reviews: Number(data.reviews || 0),
-        } as Activity;
+      if (!activityDoc.exists()) {
+        return null;
       }
 
-      return null;
+      const data = activityDoc.data();
+      return {
+        id: activityDoc.id,
+        name: data.name,
+        description: data.description,
+        price: Number(data.price || 0),
+        instructorId: data.instructorId || 'system',
+        instructorName: data.instructorName || 'Sistema',
+        horarios: Array.isArray(data.horarios) ? data.horarios : [],
+        maxStudents: data.maxStudents || 0,
+        enrolledStudents: Number(data.enrolledStudents || 0),
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        status: data.status || 'active',
+        rating: Number(data.rating || 0),
+        reviews: Number(data.reviews || 0),
+      } as Activity;
     } catch (error) {
       console.error('Erro ao buscar atividade:', error);
       throw error;
@@ -374,7 +380,7 @@ class ActivityService {
       const activityRef = doc(this.db, this.activitiesCollection, id);
       await updateDoc(activityRef, {
         status,
-        updatedAt: Date.now(),
+        updatedAt: Timestamp.fromDate(new Date()),
       });
     } catch (error) {
       console.error('Erro ao atualizar status da atividade:', error);
@@ -409,7 +415,7 @@ class ActivityService {
         batch.update(activityRef, {
           instructorId: 'paulo@hotmail.com',
           instructorName: 'Paulo',
-          updatedAt: Date.now(),
+          updatedAt: Timestamp.fromDate(new Date()),
         });
       });
 
@@ -454,7 +460,7 @@ class ActivityService {
       const activityRef = doc(this.db, this.activitiesCollection, activityId);
       await updateDoc(activityRef, {
         status: 'active',
-        updatedAt: serverTimestamp(),
+        updatedAt: Timestamp.fromDate(new Date()),
       });
     } catch (error) {
       console.error('Erro ao reativar atividade:', error);

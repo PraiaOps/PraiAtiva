@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Disable linting during build
+  // Configurações de build
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -18,13 +18,11 @@ const nextConfig = {
   },
   // Optimize experimental features
   experimental: {
-    optimizePackageImports: ['@heroicons/react', '@headlessui/react'],
-    // Enable server actions
-    serverActions: true,
+    optimizePackageImports: ['@heroicons/react', '@headlessui/react']
   },
   // Configure runtime settings
   serverRuntimeConfig: {
-    skipFirebaseInit: true,
+    skipFirebaseInit: false,
   },
   publicRuntimeConfig: {
     firebaseEnabled: true,
@@ -47,6 +45,11 @@ const nextConfig = {
         fs: false,
         net: false,
         tls: false,
+        dns: false,
+        child_process: false,
+        'firebase/app': false,
+        'firebase/auth': false,
+        'firebase/firestore': false,
       };
     }
     return config;

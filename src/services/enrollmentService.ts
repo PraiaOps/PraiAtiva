@@ -13,6 +13,8 @@ import {
   serverTimestamp,
   writeBatch,
   QueryConstraint,
+  deleteDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import { Enrollment, EnrollmentStatus } from '@/types';
 import { notificationService } from './notificationService';
@@ -303,6 +305,167 @@ class EnrollmentService {
       })) as Enrollment[];
       callback(enrollments);
     });
+  }
+
+  async updateEnrollment(
+    id: string,
+    enrollmentData: Partial<Enrollment>
+  ): Promise<void> {
+    try {
+      const enrollmentRef = doc(this.db, this.enrollmentsCollection, id);
+      const enrollmentDoc = await getDoc(enrollmentRef);
+
+      if (!enrollmentDoc.exists()) {
+        throw new Error('Inscrição não encontrada');
+      }
+
+      await updateDoc(enrollmentRef, {
+        ...enrollmentData,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar inscrição:', error);
+      throw error;
+    }
+  }
+
+  async getEnrollment(id: string): Promise<Enrollment | null> {
+    try {
+      const enrollmentRef = doc(this.db, this.enrollmentsCollection, id);
+      const enrollmentDoc = await getDoc(enrollmentRef);
+
+      if (!enrollmentDoc.exists()) {
+        return null;
+      }
+
+      const data = enrollmentDoc.data();
+      return {
+        id: enrollmentDoc.id,
+        activityId: data.activityId,
+        studentId: data.studentId,
+        studentName: data.studentName,
+        instructorId: data.instructorId,
+        instructorName: data.instructorName,
+        activityName: data.activityName,
+        status: data.status,
+        paymentInfo: data.paymentInfo,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      };
+    } catch (error) {
+      console.error('Erro ao buscar inscrição:', error);
+      throw error;
+    }
+  }
+
+  async listStudentEnrollments(studentId: string): Promise<Enrollment[]> {
+    try {
+      const enrollmentsRef = collection(this.db, this.enrollmentsCollection);
+      const q = query(
+        enrollmentsRef,
+        where('studentId', '==', studentId),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          activityId: data.activityId,
+          studentId: data.studentId,
+          studentName: data.studentName,
+          instructorId: data.instructorId,
+          instructorName: data.instructorName,
+          activityName: data.activityName,
+          status: data.status,
+          paymentInfo: data.paymentInfo,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+      });
+    } catch (error) {
+      console.error('Erro ao listar inscrições do aluno:', error);
+      throw error;
+    }
+  }
+
+  async listInstructorEnrollments(instructorId: string): Promise<Enrollment[]> {
+    try {
+      const enrollmentsRef = collection(this.db, this.enrollmentsCollection);
+      const q = query(
+        enrollmentsRef,
+        where('instructorId', '==', instructorId),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          activityId: data.activityId,
+          studentId: data.studentId,
+          studentName: data.studentName,
+          instructorId: data.instructorId,
+          instructorName: data.instructorName,
+          activityName: data.activityName,
+          status: data.status,
+          paymentInfo: data.paymentInfo,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+      });
+    } catch (error) {
+      console.error('Erro ao listar inscrições do instrutor:', error);
+      throw error;
+    }
+  }
+
+  async deleteEnrollment(id: string): Promise<void> {
+    try {
+      const enrollmentRef = doc(this.db, this.enrollmentsCollection, id);
+      const enrollmentDoc = await getDoc(enrollmentRef);
+
+      if (!enrollmentDoc.exists()) {
+        throw new Error('Inscrição não encontrada');
+      }
+
+      const data = enrollmentDoc.data();
+      await deleteDoc(enrollmentRef);
+
+      // Atualizar contagem de alunos na atividade
+      await activityService.updateEnrolledStudents(data.activityId, -1);
+    } catch (error) {
+      console.error('Erro ao deletar inscrição:', error);
+      throw error;
+    }
+  }
+
+  async updateActivityEnrollment(activityId: string, increment: number): Promise<void> {
+    try {
+      const activityRef = doc(this.db, 'activities', activityId);
+      const activityDoc = await getDoc(activityRef);
+
+      if (!activityDoc.exists()) {
+        throw new Error('Atividade não encontrada');
+      }
+
+      const currentEnrolled = activityDoc.data().enrolledStudents || 0;
+      const newEnrolled = currentEnrolled + increment;
+
+      if (newEnrolled < 0) {
+        throw new Error('Número de alunos não pode ser negativo');
+      }
+
+      await updateDoc(activityRef, {
+        enrolledStudents: newEnrolled,
+        updatedAt: Timestamp.now(),
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar número de alunos:', error);
+      throw error;
+    }
   }
 }
 

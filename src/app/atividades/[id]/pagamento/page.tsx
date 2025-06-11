@@ -1,122 +1,79 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { activityService } from '@/services/activityService';
 import { enrollmentService } from '@/services/enrollmentService';
-import { paymentService } from '@/services/paymentService';
 import { Activity } from '@/types';
-import { CheckCircleIcon, ClipboardIcon } from '@heroicons/react/24/outline';
-import Footer from '@/components/layout/Footer';
-import { QRCodeSVG } from 'qrcode.react';
+import { Enrollment } from '@/types';
+import { QrCodeIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
-export default function PaymentPage({ params }: { params: { id: string } }) {
+export default function PagamentoPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const router = useRouter();
-  const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const { user, userData } = useAuth();
+  const enrollmentId = searchParams.get('enrollmentId');
+
   const [activity, setActivity] = useState<Activity | null>(null);
+  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Prevenir execução no servidor
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  const [paymentStatus, setPaymentStatus] = useState<
-    'pending' | 'processing' | 'completed'
-  >('pending');
-  const [copied, setCopied] = useState(false);
-
-  // Chave PIX de exemplo (em produção, isso viria do backend)
-  const pixKey = '12345678900';
-  const pixCopyPaste = `00020126580014BR.GOV.BCB.PIX0136${pixKey}520400005303986540599.905802BR5915NOME EMPRESA6008BRASILIA62070503***6304E2CA`;
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   useEffect(() => {
-    const loadActivity = async () => {
+    if (!user || !enrollmentId) {
+      router.push('/login');
+      return;
+    }
+
+    const loadData = async () => {
       try {
+        setLoading(true);
+
+        // Carregar atividade
         const activityData = await activityService.getActivity(params.id);
-        if (activityData) {
-          setActivity(activityData);
-        } else {
-          setError('Atividade não encontrada');
+        if (!activityData) {
+          throw new Error('Atividade não encontrada');
+        }
+        setActivity(activityData);
+
+        // Carregar inscrição
+        const enrollmentData = await enrollmentService.getEnrollment(enrollmentId);
+        if (!enrollmentData) {
+          throw new Error('Inscrição não encontrada');
+        }
+        setEnrollment(enrollmentData);
+
+        // Se o pagamento já foi confirmado, atualizar estado
+        if (enrollmentData.paymentStatus === 'paid') {
+          setPaymentConfirmed(true);
         }
       } catch (error) {
-        console.error('Erro ao carregar atividade:', error);
-        setError('Erro ao carregar atividade');
+        console.error('Erro ao carregar dados:', error);
+        setError('Erro ao carregar dados. Tente novamente.');
       } finally {
         setLoading(false);
       }
     };
 
-    loadActivity();
-  }, [params.id]);
+    loadData();
+  }, [user, params.id, enrollmentId, router]);
 
-  const handleCopyPix = () => {
-    navigator.clipboard.writeText(pixCopyPaste);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleSimulatePayment = async () => {
-    if (!user) {
-      setError('Você precisa estar logado para realizar o pagamento.');
-      return;
-    }
-
-    if (!activity) {
-      setError('Atividade não encontrada.');
-      return;
-    }
+  const handleConfirmPayment = async () => {
+    if (!enrollment) return;
 
     try {
       setLoading(true);
-      setPaymentStatus('processing');
-
-      // 1. Criar matrícula
-      const enrollmentId = await enrollmentService.createEnrollment({
-        activityId: activity.id,
-        studentId: user.uid,
-        studentName: user.displayName || 'Aluno',
-        instructorId: activity.instructorId,
-        instructorName: activity.instructorName,
-        activityName: activity.name,
-        paymentInfo: {
-          amount: activity.price,
-          commission: activity.price * 0.15,
-          instructorAmount: activity.price * 0.85,
-          paymentMethod: 'pix',
-          paymentStatus: 'pending',
-          paymentDate: new Date(),
-        },
-      });
-
-      // 2. Criar registro de pagamento
-      const paymentId = await paymentService.createPayment({
-        studentId: user.uid,
-        studentName: user.displayName || 'Aluno',
-        instructorId: activity.instructorId,
-        activityId: activity.id,
-        enrollmentId: enrollmentId,
-        activityName: activity.name,
-        amount: activity.price,
-        paymentMethod: 'pix',
-      });
-
-      // 3. Simular processamento do pagamento
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // 4. Atualizar status do pagamento (isso irá atualizar a matrícula também)
-      await paymentService.updatePaymentStatus(paymentId, 'paid', enrollmentId);
-
-      setPaymentStatus('completed');
-      setTimeout(() => {
-        router.push('/dashboard/aluno');
-      }, 2000);
+      await enrollmentService.confirmEnrollment(enrollment.id);
+      setPaymentConfirmed(true);
     } catch (error) {
-      console.error('Erro ao processar pagamento:', error);
-      setError('Erro ao processar pagamento. Tente novamente.');
-      setPaymentStatus('pending');
+      console.error('Erro ao confirmar pagamento:', error);
+      setError('Erro ao confirmar pagamento. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -124,112 +81,118 @@ export default function PaymentPage({ params }: { params: { id: string } }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600"></div>
-      </div>
-    );
-  }
-
-  if (error || !activity) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Erro</h2>
-          <p className="text-gray-600">{error || 'Atividade não encontrada'}</p>
-          <button
-            onClick={() => router.back()}
-            className="mt-4 bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors"
-          >
-            Voltar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="container mx-auto px-4">
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h1 className="text-2xl font-semibold mb-6">Pagamento com PIX</h1>
-
-              {paymentStatus === 'pending' && (
-                <>
-                  <div className="mb-6">
-                    <h2 className="text-lg font-medium mb-2">Valor a pagar</h2>
-                    <p className="text-3xl font-bold text-sky-600">
-                      R$ {Number(activity.price).toFixed(2)}
-                    </p>
-                  </div>
-
-                  <div className="mb-8">
-                    <h2 className="text-lg font-medium mb-4">
-                      Escaneie o QR Code
-                    </h2>
-                    <div className="bg-white p-4 rounded-lg border border-gray-200 inline-block">
-                      <QRCodeSVG value={pixCopyPaste} size={200} />
-                    </div>
-                  </div>
-
-                  <div className="mb-8">
-                    <h2 className="text-lg font-medium mb-2">
-                      Ou copie o código PIX
-                    </h2>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <p className="text-sm font-mono break-all">
-                          {pixCopyPaste}
-                        </p>
-                      </div>
-                      <button
-                        onClick={handleCopyPix}
-                        className="p-3 text-gray-600 hover:text-sky-600 transition-colors"
-                      >
-                        {copied ? (
-                          <CheckCircleIcon className="h-6 w-6 text-green-500" />
-                        ) : (
-                          <ClipboardIcon className="h-6 w-6" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-6">
-                    <button
-                      onClick={handleSimulatePayment}
-                      className="w-full bg-sky-600 text-white py-3 px-4 rounded-lg hover:bg-sky-700 transition-colors font-medium"
-                    >
-                      Simular Pagamento
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {paymentStatus === 'processing' && (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Processando pagamento...</p>
-                </div>
-              )}
-
-              {paymentStatus === 'completed' && (
-                <div className="text-center py-12">
-                  <CheckCircleIcon className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                  <h2 className="text-2xl font-semibold mb-2">
-                    Pagamento Confirmado!
-                  </h2>
-                  <p className="text-gray-600 mb-4">
-                    Você será redirecionado para o dashboard em instantes...
-                  </p>
-                </div>
-              )}
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+            <div className="space-y-4">
+              <div className="h-32 bg-gray-200 rounded"></div>
+              <div className="h-32 bg-gray-200 rounded"></div>
             </div>
           </div>
         </div>
       </div>
-      <Footer />
-    </>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-700">{error}</p>
+            <button
+              onClick={() => router.back()}
+              className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            >
+              Voltar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!activity || !enrollment) {
+    return null;
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Pagamento</h1>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                {activity.name}
+              </h2>
+              <p className="text-gray-600">{activity.description}</p>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Valor:</span>
+                <span className="text-lg font-semibold text-gray-900">
+                  R$ {activity.price.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Status do Pagamento:</span>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  enrollment.paymentStatus === 'paid'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {enrollment.paymentStatus === 'paid' ? 'Pago' : 'Pendente'}
+                </span>
+              </div>
+            </div>
+
+            {paymentConfirmed ? (
+              <div className="text-center py-6">
+                <CheckCircleIcon className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Pagamento Confirmado!
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Sua inscrição foi confirmada com sucesso.
+                </p>
+                <button
+                  onClick={() => router.push('/dashboard/aluno?tab=inscricoes')}
+                  className="min-h-[44px] px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors"
+                >
+                  Ver Minhas Inscrições
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-900 mb-2">
+                    Instruções de Pagamento
+                  </h3>
+                  <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
+                    <li>Faça o pagamento via PIX</li>
+                    <li>Após o pagamento, clique no botão abaixo para confirmar</li>
+                    <li>O instrutor será notificado e confirmará sua inscrição</li>
+                  </ol>
+                </div>
+
+                <div className="flex justify-center">
+                  <button
+                    onClick={handleConfirmPayment}
+                    disabled={loading}
+                    className="min-h-[44px] px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? 'Processando...' : 'Confirmar Pagamento'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
