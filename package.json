@@ -1,12 +1,14 @@
 {
   "name": "praiativa-novo",
   "version": "0.1.0",
-  "private": true,
-  "scripts": {
+  "private": true,  "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "echo No linting configured"
+    "lint": "next lint",
+    "vercel-build": "npm run build",
+    "postinstall": "npm run build",
+    "prepare-production": "npm ci && npm run build"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",

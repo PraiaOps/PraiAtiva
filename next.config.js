@@ -1,22 +1,47 @@
-const { join } = require('path');
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Desativar verificação de linting durante o build
+  // Disable linting during build
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Desativar verificação de TypeScript durante o build
+  // Disable TypeScript checking during build
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Configuração para Vercel - Removendo output: 'standalone' que pode causar o problema
+  // Optimize build settings
   poweredByHeader: false,
   reactStrictMode: true,
   swcMinify: true,
-  // Configuração experimental simplificada
+  // Configure compiler optimization
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  // Optimize experimental features
   experimental: {
     optimizePackageImports: ['@heroicons/react', '@headlessui/react'],
+    // Enable server actions
+    serverActions: true,
+  },
+  // Configure runtime settings
+  serverRuntimeConfig: {
+    skipFirebaseInit: true,
+  },
+  publicRuntimeConfig: {
+    firebaseEnabled: true,
+    isDevelopment: process.env.NODE_ENV === 'development',
+  },
+  // Configure webpack for Firebase optimization
+  webpack: (config, { isServer }) => {
+    // Optimize client-side Firebase imports
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'firebase/app': 'firebase/app',
+        'firebase/auth': 'firebase/auth',
+        'firebase/firestore': 'firebase/firestore',
+      };
+    }
+    return config;
   },
   // Configuração para debug de revalidação e geração de estáticos
   logging: {

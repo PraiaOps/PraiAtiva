@@ -1,11 +1,11 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { getStorage } from 'firebase/storage';
-import { getAnalytics, isSupported } from 'firebase/analytics';
-import { getFunctions } from 'firebase/functions';
+import { getApps, initializeApp, FirebaseApp } from 'firebase/app';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { getAuth, Auth } from 'firebase/auth';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { Analytics, getAnalytics, isSupported } from 'firebase/analytics';
+import { Functions, getFunctions } from 'firebase/functions';
 
-// Configuração do Firebase
+// Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -16,29 +16,62 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Debug: Verificar se as variáveis de ambiente estão sendo carregadas
-console.log('Firebase Config:', {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'Presente' : 'Ausente',
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ? 'Presente' : 'Ausente',
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ? 'Presente' : 'Ausente',
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ? 'Presente' : 'Ausente',
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ? 'Presente' : 'Ausente',
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ? 'Presente' : 'Ausente',
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ? 'Presente' : 'Ausente'
-});
+let app: FirebaseApp | undefined;
+let db: Firestore | undefined;
+let auth: Auth | undefined;
+let storage: FirebaseStorage | undefined;
+let functions: Functions | undefined;
+let analytics: Promise<Analytics | null> | undefined;
 
-// Inicializa o Firebase
-const app = initializeApp(firebaseConfig);
+function initializeFirebase() {
+  try {
+    // Check if Firebase is already initialized
+    const apps = getApps();
+    if (apps.length > 0) {
+      app = apps[0];
+    } else {
+      // Verify required environment variables
+      const requiredEnvVars = [
+        'NEXT_PUBLIC_FIREBASE_API_KEY',
+        'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+        'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+      ];
 
-// Inicializa os serviços
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export const storage = getStorage(app);
-export const functions = getFunctions(app);
+      const missingEnvVars = requiredEnvVars.filter(
+        (envVar) => !process.env[envVar]
+      );
 
-// Inicializar Analytics apenas no navegador
-export const analytics = typeof window !== 'undefined'
-  ? isSupported().then(yes => yes ? getAnalytics(app) : null)
-  : null;
+      if (missingEnvVars.length > 0) {
+        throw new Error(`Missing Firebase configuration: ${missingEnvVars.join(', ')}`);
+      }
+
+      app = initializeApp(firebaseConfig);
+    }
+
+    if (!app) {
+      throw new Error('Failed to initialize Firebase app');
+    }
+
+    // Initialize Firebase services
+    db = getFirestore(app);
+    auth = getAuth(app);
+    storage = getStorage(app);
+    functions = getFunctions(app);
+
+    // Initialize analytics only in the browser
+    if (typeof window !== 'undefined') {
+      analytics = isSupported().then(yes => yes ? getAnalytics(app!) : null);
+    }
+  } catch (error) {
+    console.error('Error initializing Firebase:', error);
+    throw error;
+  }
+}
+
+// Initialize Firebase only in the browser
+if (typeof window !== 'undefined') {
+  initializeFirebase();
+}
 
 export default app;
+export { db, auth, storage, functions, analytics };
