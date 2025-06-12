@@ -1,13 +1,22 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState } from 'react';
 import { CalendarIcon, MapPinIcon, TagIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { initializeFirebase } from '@/config/firebase-config';
 
 export default function EventosPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategoria, setSelectedCategoria] = useState('todos');
+  const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      initializeFirebase();
+    }
+  }, []);
 
   // Mock de eventos para exibição
   const eventos = [
@@ -84,23 +93,23 @@ export default function EventosPage() {
       destaque: false
     }
   ];
-  
+
   // Filtrar eventos baseado na busca e categoria selecionada
   const eventosFiltrados = eventos.filter(evento => {
-    const matchesTerm = evento.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesTerm = evento.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
                        evento.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
                        evento.local.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesCategoria = selectedCategoria === 'todos' || evento.categoria === selectedCategoria;
-    
+
     return matchesTerm && matchesCategoria;
   });
-  
+
   // Eventos em destaque no topo
   const eventosDestaque = eventosFiltrados.filter(evento => evento.destaque);
   // Outros eventos abaixo
   const outrosEventos = eventosFiltrados.filter(evento => !evento.destaque);
-  
+
   const categorias = [
     { id: 'todos', nome: 'Todos', cor: 'bg-gray-500' },
     { id: 'esporte', nome: 'Esporte', cor: 'bg-blue-500' },
@@ -114,8 +123,8 @@ export default function EventosPage() {
       {/* Hero Banner */}
       <section className="page-header relative">
         <div className="absolute inset-0 z-0 opacity-20">
-          <Image 
-            src="/images/eventos.png" 
+          <Image
+            src="/images/eventos.png"
             alt="Eventos na praia"
             fill
             priority
@@ -123,14 +132,14 @@ export default function EventosPage() {
             className="object-cover object-center"
           />
         </div>
-        
+
         <div className="container mx-auto px-4 relative z-10 page-header-content">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Eventos nas Praias</h1>
             <p className="text-xl md:text-2xl opacity-90 mb-8">
               Descubra os melhores eventos esportivos, culturais e de lazer nas praias do Rio de Janeiro
             </p>
-            
+
             {/* Barra de Busca */}
             <div className="relative max-w-2xl mx-auto">
               <input
@@ -149,7 +158,7 @@ export default function EventosPage() {
           </div>
         </div>
       </section>
-      
+
       {/* Filtro por Categorias */}
       <section className="py-6 bg-white shadow-md sticky top-16 z-20">
         <div className="container mx-auto px-4">
@@ -168,7 +177,7 @@ export default function EventosPage() {
           </div>
         </div>
       </section>
-      
+
       {/* Eventos em Destaque */}
       {eventosDestaque.length > 0 && (
         <section className="py-12">
@@ -177,7 +186,7 @@ export default function EventosPage() {
               <span className="bg-orange-400 w-2 h-8 rounded mr-3"></span>
               Eventos em Destaque
             </h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {eventosDestaque.map(evento => (
                 <div key={evento.id} className="bg-white rounded-xl overflow-hidden shadow-lg flex flex-col h-full group hover:shadow-xl transition-shadow duration-300">
@@ -186,10 +195,10 @@ export default function EventosPage() {
                       {evento.titulo}
                     </h3>
                   </div>
-                  
+
                   <div className="flex-grow relative">
                     <div className="relative h-72 overflow-hidden">
-                      <Image 
+                      <Image
                         src={evento.imagem}
                         alt={evento.titulo}
                         fill
@@ -204,7 +213,7 @@ export default function EventosPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="p-6">
                     <p className="text-slate-600 mb-4">{evento.descricao}</p>
                     <div className="flex flex-wrap gap-3 text-sm text-slate-500 mb-4">
@@ -217,12 +226,12 @@ export default function EventosPage() {
                         <span>{evento.local}</span>
                       </div>
                     </div>
-                    
+
                     {evento.link && (
                       <div className="mt-2">
-                        <a 
-                          href={evento.link} 
-                          target="_blank" 
+                        <a
+                          href={evento.link}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1"
                         >
@@ -240,7 +249,7 @@ export default function EventosPage() {
           </div>
         </section>
       )}
-      
+
       {/* Outros Eventos */}
       {outrosEventos.length > 0 && (
         <section className="py-12 bg-gray-50">
@@ -249,12 +258,12 @@ export default function EventosPage() {
               <span className="bg-sky-400 w-2 h-8 rounded mr-3"></span>
               Próximos Eventos
             </h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {outrosEventos.map(evento => (
                 <div key={evento.id} className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col">
                   <div className="relative h-48 overflow-hidden">
-                    <Image 
+                    <Image
                       src={evento.imagem}
                       alt={evento.titulo}
                       fill
@@ -271,13 +280,13 @@ export default function EventosPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="p-5 flex-grow">
                     <h3 className="text-xl font-bold text-slate-800 mb-2 hover:text-blue-600 transition-colors">
                       {evento.titulo}
                     </h3>
                     <p className="text-slate-600 text-sm mb-4 line-clamp-2">{evento.descricao}</p>
-                    
+
                     <div className="flex flex-wrap gap-3 text-xs text-slate-500">
                       <div className="flex items-center gap-1">
                         <CalendarIcon className="h-3 w-3" />
@@ -289,7 +298,7 @@ export default function EventosPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="px-5 pb-5 mt-auto">
                     <Link href={`/eventos/${evento.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium inline-flex items-center gap-1">
                       Ver detalhes
@@ -304,7 +313,7 @@ export default function EventosPage() {
           </div>
         </section>
       )}
-      
+
       {/* Seção de Cadastro de Novo Evento */}
       <section className="py-16 bg-gradient-to-r from-blue-600 to-sky-400 text-white">
         <div className="container mx-auto px-4">
@@ -321,7 +330,7 @@ export default function EventosPage() {
           </div>
         </div>
       </section>
-      
+
       {/* Eventos não encontrados */}
       {eventosFiltrados.length === 0 && (
         <div className="py-12 text-center">
@@ -342,4 +351,4 @@ export default function EventosPage() {
       )}
     </div>
   );
-} 
+}

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import ClientSideWrapper from '@/components/layout/ClientSideWrapper';
+import { initializeFirebase } from '@/config/firebase-config';
 
 export default function PaymentSuccess() {
   const router = useRouter();
@@ -11,6 +12,10 @@ export default function PaymentSuccess() {
   const sessionId = searchParams.get('session_id');
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      initializeFirebase();
+    }
+
     if (!sessionId) {
       router.push('/dashboard');
     }

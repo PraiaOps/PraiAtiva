@@ -16,7 +16,7 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase only in browser
+// Singleton instances
 let firebaseApp: FirebaseApp | null = null;
 let firestoreDb: Firestore | null = null;
 let firebaseAuth: Auth | null = null;
@@ -24,24 +24,37 @@ let firebaseStorage: FirebaseStorage | null = null;
 let firebaseFunctions: Functions | null = null;
 let firebaseAnalytics: Promise<Analytics | null> | null = null;
 
-if (typeof window !== 'undefined') {
-  try {
-    // Check if Firebase is already initialized
-    firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    
-    if (firebaseApp) {
-      firestoreDb = getFirestore(firebaseApp);
-      firebaseAuth = getAuth(firebaseApp);
-      firebaseStorage = getStorage(firebaseApp);
-      firebaseFunctions = getFunctions(firebaseApp);
-      firebaseAnalytics = isSupported().then(yes => yes ? getAnalytics(firebaseApp!) : null);
+// Função para inicialização lazy do Firebase
+export function initializeFirebase() {
+  if (typeof window === 'undefined') return null;
+
+  if (!firebaseApp) {
+    try {
+      firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+      if (firebaseApp) {
+        firestoreDb = getFirestore(firebaseApp);
+        firebaseAuth = getAuth(firebaseApp);
+        firebaseStorage = getStorage(firebaseApp);
+        firebaseFunctions = getFunctions(firebaseApp);
+        firebaseAnalytics = isSupported().then(yes => yes ? getAnalytics(firebaseApp!) : null);
+      }
+    } catch (error) {
+      console.error('Error initializing Firebase:', error);
     }
-  } catch (error) {
-    console.error('Error initializing Firebase:', error);
-    // Don't throw error, just log it
   }
+
+  return {
+    app: firebaseApp,
+    db: firestoreDb,
+    auth: firebaseAuth,
+    storage: firebaseStorage,
+    functions: firebaseFunctions,
+    analytics: firebaseAnalytics
+  };
 }
 
+// Exportar instâncias
 export const app = firebaseApp;
 export const db = firestoreDb;
 export const auth = firebaseAuth;
