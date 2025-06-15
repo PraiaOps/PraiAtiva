@@ -2,285 +2,13 @@
 
 import { useState, Fragment } from 'react';
 import { MagnifyingGlassIcon, AdjustmentsHorizontalIcon, MapPinIcon, StarIcon } from '@heroicons/react/24/outline';
+import { Activity } from '@/types';
+import { activityService } from '@/services/activityService';
 import Footer from '@/components/layout/Footer';
-import React from 'react';
+import Link from 'next/link';
+import React, { useEffect } from 'react';
 import CapacityBar from '@/components/CapacityBar';
 
-// Dados simulados para demonstração
-const mockActivities = [
-  // Atividades já existentes (agora com horários)
-  {
-    id: '1',
-    name: 'Aula de Surf para Iniciantes',
-    type: 'sports',
-    beach: 'Praia de Copacabana',
-    city: 'Rio de Janeiro',
-    price: 80,
-    rating: 4.7,
-    reviews: 24,
-    image: '/images/surf.jpg',
-    entrepreneur: 'Escola Carioca de Surf',
-    description: 'Aulas de surf para iniciantes com equipamentos inclusos e instrutor experiente.',
-    tags: ['Surf', 'Iniciante', 'Equipamentos inclusos'],
-    horarios: [
-      { periodo: 'Manhã', horario: '07:00 às 08:30', local: 'mar', limiteAlunos: 10, alunosMatriculados: 3, diaSemana: 'segunda' },
-      { periodo: 'Tarde', horario: '16:00 às 17:30', local: 'mar', limiteAlunos: 10, alunosMatriculados: 5, diaSemana: 'quarta' },
-      { periodo: 'Noite', horario: '19:00 às 20:30', local: 'mar', limiteAlunos: 8, alunosMatriculados: 2, diaSemana: 'sexta' },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Vôlei de Praia - Turma Avançada',
-    type: 'sports',
-    beach: 'Praia de Ipanema',
-    city: 'Rio de Janeiro',
-    price: 60,
-    rating: 4.5,
-    reviews: 18,
-    image: '/images/volei-de-praia.jpg',
-    entrepreneur: 'Academia Carioca',
-    description: 'Treino de vôlei de praia para jogadores de nível avançado. Quadras exclusivas.',
-    tags: ['Vôlei', 'Avançado', 'Competitivo'],
-    horarios: [
-      { periodo: 'Manhã', horario: '08:00 às 09:30', local: 'areia', limiteAlunos: 12, alunosMatriculados: 7, diaSemana: 'terça' },
-      { periodo: 'Tarde', horario: '17:00 às 18:30', local: 'areia', limiteAlunos: 12, alunosMatriculados: 10, diaSemana: 'quinta' },
-    ],
-  },
-  {
-    id: '3',
-    name: 'Stand Up Paddle ao Pôr do Sol',
-    type: 'leisure',
-    beach: 'Praia do Forte',
-    city: 'Cabo Frio',
-    price: 120,
-    rating: 4.9,
-    reviews: 36,
-    image: '/images/standup.jpg',
-    entrepreneur: 'Cabo SUP Experience',
-    description: 'Passeio de Stand Up Paddle ao pôr do sol com instrutor e equipamentos. Inclui fotos.',
-    tags: ['SUP', 'Pôr do sol', 'Fotos inclusas'],
-    horarios: [
-      { periodo: 'Tarde', horario: '17:00 às 18:30', local: 'mar', limiteAlunos: 8, alunosMatriculados: 6, diaSemana: 'sexta' },
-    ],
-  },
-  {
-    id: '4',
-    name: 'Yoga na Praia - Despertar',
-    type: 'wellness',
-    beach: 'Praia de Juquehy',
-    city: 'São Sebastião',
-    price: 50,
-    rating: 4.8,
-    reviews: 42,
-    image: '/images/yoga.jpg', // Corrigido para imagem existente
-    entrepreneur: 'Prana Yoga',
-    description: 'Sessão de yoga matinal na praia. Ideal para começar o dia com energia e tranquilidade.',
-    tags: ['Yoga', 'Amanhecer', 'Meditação'],
-    horarios: [
-      { periodo: 'Manhã', horario: '06:30 às 08:00', local: 'areia', limiteAlunos: 20, alunosMatriculados: 12, diaSemana: 'segunda' },
-    ],
-  },
-  {
-    id: '5',
-    name: 'Curso de Kitesurf - Básico',
-    type: 'sports',
-    beach: 'Praia do Preá',
-    city: 'Cruz',
-    price: 200,
-    rating: 4.6,
-    reviews: 19,
-    image: '/images/kitesurf.jpg',
-    entrepreneur: 'Ventos do Preá',
-    description: 'Curso básico de kitesurf com teoria e prática. Equipamentos de segurança inclusos.',
-    tags: ['Kitesurf', 'Básico', 'Certificado'],
-    horarios: [
-      { periodo: 'Manhã', horario: '09:00 às 11:00', local: 'mar', limiteAlunos: 6, alunosMatriculados: 4, diaSemana: 'quarta' },
-      { periodo: 'Tarde', horario: '15:00 às 17:00', local: 'mar', limiteAlunos: 6, alunosMatriculados: 5, diaSemana: 'sexta' },
-    ],
-  },
-  {
-    id: '6',
-    name: 'Passeio de Caiaque pelas Ilhas',
-    type: 'tourism',
-    beach: 'Praia da Armação',
-    city: 'Florianópolis',
-    price: 150,
-    rating: 4.7,
-    reviews: 28,
-    image: '/images/caiaque.jpg',
-    entrepreneur: 'Floripa Aventuras',
-    description: 'Passeio guiado de caiaque pelas ilhas próximas. Ideal para observação da vida marinha.',
-    tags: ['Caiaque', 'Passeio guiado', 'Vida marinha'],
-    horarios: [
-      { periodo: 'Manhã', horario: '08:00 às 10:00', local: 'mar', limiteAlunos: 10, alunosMatriculados: 8, diaSemana: 'terça' },
-      { periodo: 'Tarde', horario: '14:00 às 16:00', local: 'mar', limiteAlunos: 10, alunosMatriculados: 7, diaSemana: 'quinta' },
-    ],
-  },
-  // Novas atividades em Icaraí
-  {
-    id: '7',
-    name: 'Beach Tennis para Iniciantes',
-    type: 'sports',
-    beach: 'Praia de Icaraí',
-    city: 'Niterói',
-    price: 70,
-    rating: 4.8,
-    reviews: 15,
-    image: '/images/beach-tennis.jpg',
-    entrepreneur: 'Icaraí Beach Tennis',
-    description: 'Aulas de beach tennis para iniciantes, com raquetes e bolas inclusas.',
-    tags: ['Beach Tennis', 'Iniciante', 'Diversão'],
-    horarios: [
-      { periodo: 'Manhã', horario: '07:30 às 09:00', local: 'areia', limiteAlunos: 10, alunosMatriculados: 6, diaSemana: 'segunda' },
-      { periodo: 'Tarde', horario: '17:00 às 18:30', local: 'areia', limiteAlunos: 10, alunosMatriculados: 8, diaSemana: 'quarta' },
-    ],
-  },
-  {
-    id: '8',
-    name: 'Treinamento Funcional na Areia',
-    type: 'wellness',
-    beach: 'Praia de Icaraí',
-    city: 'Niterói',
-    price: 60,
-    rating: 4.9,
-    reviews: 22,
-    image: '/images/funcional.jpg',
-    entrepreneur: 'Funcional Icaraí',
-    description: 'Treinos funcionais em grupo na areia, para todas as idades.',
-    tags: ['Funcional', 'Grupo', 'Saúde'],
-    horarios: [
-      { periodo: 'Manhã', horario: '06:30 às 07:30', local: 'areia', limiteAlunos: 15, alunosMatriculados: 10, diaSemana: 'terça' },
-      { periodo: 'Noite', horario: '19:00 às 20:00', local: 'areia', limiteAlunos: 15, alunosMatriculados: 12, diaSemana: 'quinta' },
-    ],
-  },
-  {
-    id: '9',
-    name: 'Aula de Slackline',
-    type: 'sports',
-    beach: 'Praia de Icaraí',
-    city: 'Niterói',
-    price: 40,
-    rating: 4.6,
-    reviews: 10,
-    image: '/images/slackline.jpg',
-    entrepreneur: 'Slackline Niterói',
-    description: 'Aprenda o equilíbrio e a concentração com aulas de slackline na praia.',
-    tags: ['Slackline', 'Equilíbrio', 'Diversão'],
-    horarios: [
-      { periodo: 'Tarde', horario: '15:00 às 16:30', local: 'areia', limiteAlunos: 8, alunosMatriculados: 5, diaSemana: 'quarta' },
-    ],
-  },
-  {
-    id: '10',
-    name: 'Corrida Orientada',
-    type: 'sports',
-    beach: 'Praia de Icaraí',
-    city: 'Niterói',
-    price: 30,
-    rating: 4.7,
-    reviews: 12,
-    image: '/images/corrida.jpg',
-    entrepreneur: 'Run Icaraí',
-    description: 'Corrida orientada com acompanhamento de treinador e dicas de performance.',
-    tags: ['Corrida', 'Performance', 'Saúde'],
-    horarios: [
-      { periodo: 'Manhã', horario: '06:00 às 07:00', local: 'calcadão', limiteAlunos: 20, alunosMatriculados: 15, diaSemana: 'segunda' },
-    ],
-  },
-  {
-    id: '11',
-    name: 'Aula de Meditação ao Pôr do Sol',
-    type: 'wellness',
-    beach: 'Praia de Icaraí',
-    city: 'Niterói',
-    price: 35,
-    rating: 4.9,
-    reviews: 8,
-    image: '/images/meditação.jpg',
-    entrepreneur: 'Medita Niterói',
-    description: 'Sessão de meditação guiada ao pôr do sol, aberta a todos os níveis.',
-    tags: ['Meditação', 'Bem-estar', 'Pôr do sol'],
-    horarios: [
-      { periodo: 'Tarde', horario: '18:00 às 19:00', local: 'areia', limiteAlunos: 25, alunosMatriculados: 20, diaSemana: 'sexta' },
-    ],
-  },
-  {
-    id: '12',
-    name: 'Aula de Frescobol',
-    type: 'sports',
-    beach: 'Praia de Icaraí',
-    city: 'Niterói',
-    price: 45,
-    rating: 4.5,
-    reviews: 9,
-    image: '/images/frescobol.jpg',
-    entrepreneur: 'Frescobol Icaraí',
-    description: 'Aulas de frescobol para todas as idades, com raquetes e bolas inclusas.',
-    tags: ['Frescobol', 'Diversão', 'Praia'],
-    horarios: [
-      { periodo: 'Manhã', horario: '08:00 às 09:00', local: 'areia', limiteAlunos: 10, alunosMatriculados: 7, diaSemana: 'terça' },
-      { periodo: 'Tarde', horario: '16:00 às 17:00', local: 'areia', limiteAlunos: 10, alunosMatriculados: 8, diaSemana: 'quinta' },
-    ],
-  },
-  // Atividades avulsas (Cultura, Lazer, Meio Ambiente)
-  {
-    id: '13',
-    name: 'Sarau de Poesia na Praia',
-    type: 'cultura',
-    beach: 'Praia das Flechas',
-    city: 'Niterói',
-    price: 0,
-    rating: 5.0,
-    reviews: 5,
-    image: '/images/sarau.jpg',
-    entrepreneur: 'Coletivo Cultural Niterói',
-    description: 'Evento avulso de poesia e música aberto ao público, promovendo cultura local.',
-    tags: ['Cultura', 'Poesia', 'Música'],
-    horarios: [
-      { periodo: 'Noite', horario: '20:00 às 22:00', local: 'calcadão', limiteAlunos: 100, alunosMatriculados: 40 },
-    ],
-    avulso: true,
-    categoriaAvulsa: 'Cultura',
-  },
-  {
-    id: '14',
-    name: 'Cinema ao Ar Livre',
-    type: 'lazer',
-    beach: 'Praia do Leblon',
-    city: 'Rio de Janeiro',
-    price: 0,
-    rating: 4.8,
-    reviews: 20,
-    image: '/images/cinema.jpg',
-    entrepreneur: 'Prefeitura RJ',
-    description: 'Sessão de cinema gratuita ao ar livre, traga sua cadeira ou canga.',
-    tags: ['Lazer', 'Cinema', 'Família'],
-    horarios: [
-      { periodo: 'Noite', horario: '19:30 às 22:00', local: 'calcadão', limiteAlunos: 200, alunosMatriculados: 120 },
-    ],
-    avulso: true,
-    categoriaAvulsa: 'Lazer',
-  },
-  {
-    id: '15',
-    name: 'Mutirão de Limpeza de Praia',
-    type: 'meio-ambiente',
-    beach: 'Praia de Piratininga',
-    city: 'Niterói',
-    price: 0,
-    rating: 5.0,
-    reviews: 12,
-    image: '/images/limpeza.jpeg',
-    entrepreneur: 'ONG VerdeMar',
-    description: 'Ação voluntária para limpeza da praia e conscientização ambiental.',
-    tags: ['Meio Ambiente', 'Voluntariado', 'Conscientização'],
-    horarios: [
-      { periodo: 'Manhã', horario: '08:00 às 10:30', local: 'areia', limiteAlunos: 50, alunosMatriculados: 30 },
-    ],
-    avulso: true,
-    categoriaAvulsa: 'Meio Ambiente',
-  },
-];
 
 const activityTypes = [
   { id: 'all', name: 'Todos' },
@@ -374,8 +102,30 @@ export default function AtividadesPage() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedBeach, setSelectedBeach] = useState('all');
 
+  // Novo estado para atividades reais e loading
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Efeito para carregar atividades do serviço
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        setLoadingActivities(true);
+        const data = await activityService.listActivities();
+        setActivities(data);
+      } catch (error) {
+        console.error('Erro ao carregar atividades:', error);
+        setFetchError('Erro ao carregar atividades. Tente novamente mais tarde.');
+      } finally {
+        setLoadingActivities(false);
+      }
+    };
+    fetchActivities();
+  }, []); // Executa apenas uma vez ao montar
+
   // Filtrar atividades
-  const filteredActivities = mockActivities.filter((activity) => {
+  const filteredActivities = activities.filter((activity) => {
     const matchesSearch =
       activity.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.beach.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -395,7 +145,7 @@ export default function AtividadesPage() {
         }
         return h.local === selectedLocal;
       });
-    // Filtro de dia da semana: se não for 'all', pelo menos um horário deve bater com o dia
+    // Filtro de dia da semana: se não for 'all', pelo menos um horário deve bater com o dia (corrigido para usar o estado 'activities')
     const matchesWeekDay =
       selectedWeekDay === 'all' ||
       activity.horarios.some((h: any) => h.diaSemana === selectedWeekDay);
@@ -424,7 +174,7 @@ export default function AtividadesPage() {
     ];
     // Organiza horários por dia
     const horariosPorDia: Record<string, any[]> = {};
-    dias.forEach((d) => (horariosPorDia[d.id] = []));
+ dias.forEach((d) => (horariosPorDia[d.id] = []));
     activities.forEach((activity: any) => {
       activity.horarios.forEach((h: any) => {
         // Filtros de local, dia, tipo, cidade, praia, preço
@@ -617,11 +367,11 @@ export default function AtividadesPage() {
                     ))}
                   </div>
                   {/* Calendário dinâmico (simples, mostra horários filtrados por dia) */}
-                  {showCalendar && (
+                {showCalendar && !loadingActivities && !fetchError && (
                     <div className="bg-gray-50 border rounded-lg p-3 mt-2 animate-fade-in">
-                      <h4 className="font-semibold text-sm mb-2 text-sky-700">Calendário semanal de horários</h4>
-                      <WeeklyCalendar
-                        activities={mockActivities}
+                      <h4 className="font-semibold text-sm mb-2 text-sky-700">Calendário semanal de horários (filtrado pelas opções acima)</h4>
+ <WeeklyCalendar
+                        activities={activities}
                         selectedLocal={selectedLocal}
                         selectedWeekDay={selectedWeekDay}
                         selectedType={selectedType}
@@ -706,74 +456,98 @@ export default function AtividadesPage() {
             <h2 className="text-xl font-semibold mb-6">
               {filteredActivities.length} atividades encontradas
             </h2>
-            
+
+            {/* Loading state */}
+            {loadingActivities && (
+               <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Carregando atividades...</p>
+               </div>
+            )}
+
+            {/* Error state */}
+            {!loadingActivities && fetchError && (
+               <div className="text-center py-12 text-red-600">
+                  <p>{fetchError}</p>
+                  <button
+                     onClick={() => { /* Implement retry logic */ }}
+                     className="mt-4 bg-red-500 text-white px-4 py-2 rounded"
+                  >
+                     Tentar novamente
+                  </button>
+               </div>
+            )}
             {filteredActivities.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredActivities.map((activity) => (
-                  <div
+                {filteredActivities.map((activity) => ( // Removido o div que envolvia o Link
+                  <Link
                     key={activity.id}
+                    href={`/atividades/${activity.id}`}
                     className="activity-card group bg-white rounded-xl shadow-md hover:shadow-lg transition-all border border-sky-100 overflow-hidden flex flex-col animate-fade-in"
                   >
-                    <div className="relative h-44 sm:h-48 w-full overflow-hidden">
-                      {activity.image ? (
-                        <img
-                          src={activity.image}
-                          alt={activity.name}
-                          className="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
-                          loading="lazy"
-                          onError={e => (e.currentTarget.src = '/images/surf.jpg')}
-                        />
-                      ) : (
-                        <div className="h-full w-full bg-gray-200 flex items-center justify-center">
-                          <span className="text-gray-500 text-xs">Imagem não disponível</span>
+                    {/* Conteúdo do Card (mantido igual, mas agora dentro do Link) */}
+                    <>
+                      <div className="relative h-44 sm:h-48 w-full overflow-hidden">
+                        {activity.image ? (
+                          <img
+                            src={activity.image}
+                            alt={activity.name}
+                            className="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                            onError={e => (e.currentTarget.src = '/images/surf.jpg')}
+                          />
+                        ) : (
+                          <div className="h-full w-full bg-gray-200 flex items-center justify-center">
+                            <span className="text-gray-500 text-xs">Imagem não disponível</span>
+                          </div>
+                        )}
+                        <div className="absolute top-2 right-2 bg-white/90 text-sky-700 font-bold px-3 py-1 rounded-full text-xs shadow">
+                          R$ {activity.price.toFixed(2)}
                         </div>
-                      )}
-                      <div className="absolute top-2 right-2 bg-white/90 text-sky-700 font-bold px-3 py-1 rounded-full text-xs shadow">
-                        R$ {activity.price.toFixed(2)}
                       </div>
-                    </div>
-                    <div className="p-4 flex-1 flex flex-col">
-                      <h3 className="text-base md:text-lg font-semibold mb-1 hover:text-primary-600 transition-colors truncate" title={activity.name}>
-                        {activity.name}
-                      </h3>
-                      <div className="flex items-center text-gray-600 mb-2 gap-2">
-                        <MapPinIcon className="h-4 w-4 mr-1" />
-                        <span className="text-xs md:text-sm truncate">{activity.beach}, {activity.city}</span>
-                      </div>
-                      {activity.horarios && (
-                        <div className="mb-2">
-                          <span className="font-medium text-xs text-primary-700">Horários:</span>
-                          <ul className="text-xs text-gray-700 ml-2 space-y-1">
-                            {activity.horarios.map((h, idx) => (
-                              <li key={idx} className="flex items-center justify-between gap-2 bg-sky-50 rounded px-2 py-1 border border-sky-100 shadow-sm">
-                                <div className="flex flex-col">
-                                  <span className="font-semibold text-primary-700 text-xs leading-tight">{h.periodo}</span>
-                                  <span className="text-[11px] text-gray-500 leading-tight">{h.horario}</span>
-                                </div>
-                                <CapacityBar filled={h.alunosMatriculados} total={h.limiteAlunos} className="ml-2 flex-shrink-0" />
-                              </li>
-                            ))}
-                          </ul>
+                      <div className="p-4 flex-1 flex flex-col">
+                        <h3 className="text-base md:text-lg font-semibold mb-1 hover:text-primary-600 transition-colors truncate" title={activity.name}>
+                          {activity.name}
+                        </h3>
+                        <div className="flex items-center text-gray-600 mb-2 gap-2">
+                          <MapPinIcon className="h-4 w-4 mr-1" />
+                          <span className="text-xs md:text-sm truncate">{activity.beach}, {activity.city}</span>
                         </div>
-                      )}
-                      <p className="text-gray-600 text-xs md:text-sm mb-2 md:mb-4 line-clamp-2">{activity.description}</p>
-                      <div className="flex items-center justify-between mt-auto">
-                        <div className="flex items-center">
-                          <StarIcon className="h-4 w-4 md:h-5 md:w-5 text-yellow-500 mr-1" />
-                          <span className="font-medium text-xs md:text-base">{activity.rating}</span>
-                          <span className="text-gray-600 text-xs md:text-sm ml-1">({activity.reviews} avaliações)</span>
+                        {activity.horarios && (
+                          <div className="mb-2">
+                            <span className="font-medium text-xs text-primary-700">Horários:</span>
+                            <ul className="text-xs text-gray-700 ml-2 space-y-1">
+                              {activity.horarios.map((h, idx) => (
+                                <li key={idx} className="flex items-center justify-between gap-2 bg-sky-50 rounded px-2 py-1 border border-sky-100 shadow-sm">
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-primary-700 text-xs leading-tight">{h.periodo}</span>
+                                    <span className="text-[11px] text-gray-500 leading-tight">{h.horario}</span>
+                                  </div>
+                                  <CapacityBar filled={h.alunosMatriculados} total={h.limiteAlunos} className="ml-2 flex-shrink-0" />
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        <p className="text-gray-600 text-xs md:text-sm mb-2 md:mb-4 line-clamp-2">{activity.description}</p>
+                        <div className="flex items-center justify-between mt-auto">
+                          <div className="flex items-center">
+                            <StarIcon className="h-4 w-4 md:h-5 md:w-5 text-yellow-500 mr-1" />
+                            <span className="font-medium text-xs md:text-base">{activity.rating}</span>
+                            <span className="text-gray-600 text-xs md:text-sm ml-1">({activity.reviews} avaliações)</span>
+                          </div>
+                          <div className="text-xs md:text-sm text-gray-600">{activity.entrepreneur}</div>
                         </div>
-                        <div className="text-xs md:text-sm text-gray-600">{activity.entrepreneur}</div>
+                        <div className="mt-2 md:mt-3 flex flex-wrap gap-2">
+                          {activity.tags && activity.tags.map((tag: string, index: number) => (
+                            <span key={index} className="badge text-xs md:text-sm bg-sky-100 text-sky-700 px-2 py-1 rounded-full font-medium">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      <div className="mt-2 md:mt-3 flex flex-wrap gap-2">
-                        {activity.tags && activity.tags.map((tag: string, index: number) => (
-                          <span key={index} className="badge text-xs md:text-sm bg-sky-100 text-sky-700 px-2 py-1 rounded-full font-medium">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                    </>
+                  </Link> // Fim do Link
                 ))}
               </div>
             ) : (

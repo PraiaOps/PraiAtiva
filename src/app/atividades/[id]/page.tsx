@@ -217,18 +217,15 @@ export default function ActivityDetailsPage({
                     </span>
                   </div>
 
-                  {enrollment ? (
+                  {enrollment && (enrollment.status === 'confirmed' || enrollment.status === 'pending') ? (
+                    // Mostra status se enrollment existe E o status for confirmed ou pending
                     <button
-                      className="w-full bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-medium cursor-not-allowed"
+                       className="w-full bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-medium cursor-not-allowed"
                       disabled
                     >
                       {enrollment.status === 'confirmed'
                         ? 'Inscrito'
-                        : enrollment.status === 'pending'
-                        ? 'Aguardando Confirmação'
-                        : enrollment.status === 'cancelled'
-                        ? 'Cancelado'
-                        : 'Concluído'}
+                        : 'Aguardando Confirmação'} {/* Ajuste o texto conforme seus status */}
                     </button>
                   ) : (
                     <button

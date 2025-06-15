@@ -38,8 +38,8 @@ export default function InstrutorDashboard() {
 
     // Escutar matrículas em tempo real
     const unsubscribeEnrollments = enrollmentService.subscribeToEnrollments(
-      (enrollments) => setEnrollments(enrollments),
-      { instructorId: user.uid }
+      { instructorId: user.uid }, // Objeto de filtros como primeiro argumento
+      (enrollments) => setEnrollments(enrollments) // Callback como segundo argumento
     );
 
     // Escutar notificações em tempo real
@@ -82,7 +82,7 @@ export default function InstrutorDashboard() {
 
   const handleConfirmEnrollment = async (id: string) => {
     try {
-      await enrollmentService.updateEnrollment(id, { status: 'confirmed' });
+      await enrollmentService.confirmEnrollment(id);
     } catch (error) {
       console.error('Erro ao confirmar matrícula:', error);
       setError('Erro ao confirmar matrícula. Tente novamente.');
@@ -93,7 +93,7 @@ export default function InstrutorDashboard() {
     if (!confirm('Tem certeza que deseja cancelar esta matrícula?')) return;
 
     try {
-      await enrollmentService.updateEnrollment(id, { status: 'cancelled' });
+      await enrollmentService.cancelEnrollment(id);
     } catch (error) {
       console.error('Erro ao cancelar matrícula:', error);
       setError('Erro ao cancelar matrícula. Tente novamente.');
@@ -102,7 +102,7 @@ export default function InstrutorDashboard() {
 
   const handleMarkNotificationAsRead = async (id: string) => {
     try {
-      await notificationService.updateNotification(id, { read: true });
+      await notificationService.updateNotificationFields(id, { read: true });
     } catch (error) {
       console.error('Erro ao marcar notificação como lida:', error);
     }

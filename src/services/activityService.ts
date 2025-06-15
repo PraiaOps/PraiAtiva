@@ -19,11 +19,15 @@ import {
   writeBatch,
   setDoc,
 } from 'firebase/firestore';
-import { notificationService } from './notificationService';
-import { Activity, ActivityType, ActivityStatus } from '../types';
+
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
-class ActivityService {
+// Importe a definição do tipo Activity de um arquivo centralizado
+// (Recomendado para consistência em todo o projeto)
+import { Activity, ActivityStatus } from '../types'; // Assumindo que você tem um src/types/index.ts com essas definições
+
+
+export class ActivityService {
   private activitiesCollection = 'activities';
   private functions = getFunctions();
 
@@ -56,7 +60,7 @@ class ActivityService {
           reviews: 0,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          status: 'active' as ActivityStatus,
+          status: activity.status || 'active', // Usar o status fornecido se existir, senão default
         }
       );
 
@@ -73,9 +77,9 @@ class ActivityService {
   async updateActivity(id: string, activity: Partial<Activity>): Promise<void> {
     try {
       const activityRef = doc(db, this.activitiesCollection, id);
-      const updateData = {
+      const updateData: any = { // Usar any temporariamente para flexibilidade na atualização
         ...activity,
-        updatedAt: Date.now(),
+        updatedAt: serverTimestamp(), // Usar serverTimestamp
       };
 
       if (activity.price !== undefined) {
@@ -103,12 +107,12 @@ class ActivityService {
         throw new Error('Atividade não encontrada');
       }
 
-      const activity = activityDoc.data() as Activity;
+      // Não precisamos buscar a atividade inteira apenas para atualizar um campo
       const batch = writeBatch(db);
 
       // Atualiza a contagem geral da atividade
       batch.update(activityRef, {
-        currentParticipants: increment(delta),
+        enrolledStudents: increment(delta), // Corrigido para usar enrolledStudents
         updatedAt: serverTimestamp(),
       });
 
@@ -149,6 +153,16 @@ class ActivityService {
           price: Number(data.price || 0),
           rating: Number(data.rating || 0),
           reviews: Number(data.reviews || 0),
+           // Garantir que todas as propriedades do tipo Activity estejam presentes
+          image: data.image || '',
+          beach: data.beach || '',
+          city: data.city || '',
+          enrolledStudents: data.enrolledStudents || 0, // Garantir enrolledStudents
+          instructorName: data.instructorName || data.entrepreneur || 'Sistema', // Garantir instructorName
+          instructorId: data.instructorId || 'system', // Garantir instructorId
+          description: data.description || '', // Garantir description
+          status: data.status || 'active', // Garantir status
+          // Adicionar outras propriedades do tipo Activity conforme necessário
         } as Activity;
       }
 
@@ -171,10 +185,11 @@ class ActivityService {
       min?: number;
       max?: number;
     };
+    // Adicionar outros filtros conforme a necessidade
   }): Promise<Activity[]> {
     try {
       const activitiesRef = collection(db, this.activitiesCollection);
-      const constraints = [];
+      const constraints: any[] = []; // Usar any[] para flexibilidade com query constraints
 
       if (filters?.instructorId) {
         constraints.push(where('instructorId', '==', filters.instructorId));
@@ -210,16 +225,33 @@ class ActivityService {
       const activities = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        price: Number(doc.data().price),
+        // Converter campos para o tipo correto e fornecer fallbacks
+        price: Number(doc.data().price || 0),
         status: doc.data().status || 'active',
         instructorId: doc.data().instructorId || 'system',
         instructorName:
-          doc.data().instructorName || doc.data().entrepreneur || 'Sistema',
+          doc.data().instructorName || doc.data().entrepreneur || 'Sistema', // Considerar entrepreneur como fallback para instructorName
+        enrolledStudents: doc.data().enrolledStudents || 0, // Adicionar enrolledStudents
+        image: doc.data().image || '', // Adicionar image
+        beach: doc.data().beach || '', // Adicionar beach
+        city: doc.data().city || '', // Adicionar city
+        horarios: Array.isArray(doc.data().horarios) ? doc.data().horarios.map((h: any) => ({ // Adicionar e mapear horarios
+           periodo: h.periodo || '',
+           horario: h.horario || '',
+           local: h.local || 'areia',
+           limiteAlunos: h.limiteAlunos || 0,
+           alunosMatriculados: h.alunosMatriculados || 0,
+           diaSemana: h.diaSemana || '',
+        })) : [],
+        description: doc.data().description || '', // Adicionar description
+        rating: Number(doc.data().rating || 0), // Adicionar rating
+        reviews: Number(doc.data().reviews || 0), // Adicionar reviews
+        // Adicionar outras propriedades conforme a definição do tipo Activity
       })) as Activity[];
 
       console.log(
         'Atividades carregadas:',
-        activities.map(a => ({ id: a.id, name: a.name }))
+        activities.map(a => ({ id: a.id, name: a.name, status: a.status })) // Incluir status no log
       );
       return activities;
     } catch (error) {
@@ -242,10 +274,12 @@ class ActivityService {
         min?: number;
         max?: number;
       };
-    }
-  ) {
+    },
+    errorCallback?: (error: any) => void // Adicionar errorCallback
+  ): () => void // Retorna a função de unsubscribe
+  {
     const activitiesRef = collection(db, this.activitiesCollection);
-    const constraints = [];
+    const constraints: any[] = []; // Usar any[] para flexibilidade com query constraints
 
     if (filters?.instructorId) {
       constraints.push(where('instructorId', '==', filters.instructorId));
@@ -274,23 +308,47 @@ class ActivityService {
     const q = query(
       activitiesRef,
       ...constraints,
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc') // Ordernar
     );
 
     return onSnapshot(q, snapshot => {
       const activities = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        price: Number(doc.data().price),
+        // Converter campos para o tipo correto e fornecer fallbacks
+        price: Number(doc.data().price || 0),
         status: doc.data().status || 'active',
         instructorId: doc.data().instructorId || 'system',
         instructorName:
-          doc.data().instructorName || doc.data().entrepreneur || 'Sistema',
+          doc.data().instructorName || doc.data().entrepreneur || 'Sistema', // Considerar entrepreneur como fallback para instructorName
+        enrolledStudents: doc.data().enrolledStudents || 0, // Adicionar enrolledStudents
+        image: doc.data().image || '', // Adicionar image
+        beach: doc.data().beach || '', // Adicionar beach
+        city: doc.data().city || '', // Adicionar city
+         horarios: Array.isArray(doc.data().horarios) ? doc.data().horarios.map((h: any) => ({ // Adicionar e mapear horarios
+           periodo: h.periodo || '',
+           horario: h.horario || '',
+           local: h.local || 'areia',
+           limiteAlunos: h.limiteAlunos || 0,
+           alunosMatriculados: h.alunosMatriculados || 0,
+           diaSemana: h.diaSemana || '',
+        })) : [],
+        description: doc.data().description || '', // Adicionar description
+        rating: Number(doc.data().rating || 0), // Adicionar rating
+        reviews: Number(doc.data().reviews || 0), // Adicionar reviews
+         // Adicionar outras propriedades conforme a definição do tipo Activity
       })) as Activity[];
 
       callback(activities);
+    }, error => { // Passar errorCallback para onSnapshot
+       if (errorCallback) {
+           errorCallback(error);
+       } else {
+           console.error('Erro na subscrição de atividades:', error); // Log fallback
+       }
     });
   }
+
 
   /**
    * Busca atividades de um instrutor
@@ -304,10 +362,34 @@ class ActivityService {
       );
 
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
+       const activities = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
+        // Converter campos para o tipo correto e fornecer fallbacks
+        price: Number(doc.data().price || 0),
+        status: doc.data().status || 'active',
+        instructorId: doc.data().instructorId || 'system',
+        instructorName:
+          doc.data().instructorName || doc.data().entrepreneur || 'Sistema', // Considerar entrepreneur como fallback para instructorName
+        enrolledStudents: doc.data().enrolledStudents || 0, // Adicionar enrolledStudents
+        image: doc.data().image || '', // Adicionar image
+        beach: doc.data().beach || '', // Adicionar beach
+        city: doc.data().city || '', // Adicionar city
+        horarios: Array.isArray(doc.data().horarios) ? doc.data().horarios.map((h: any) => ({ // Adicionar e mapear horarios
+           periodo: h.periodo || '',
+           horario: h.horario || '',
+           local: h.local || 'areia',
+           limiteAlunos: h.limiteAlunos || 0,
+           alunosMatriculados: h.alunosMatriculados || 0,
+           diaSemana: h.diaSemana || '',
+        })) : [],
+        description: doc.data().description || '', // Adicionar description
+        rating: Number(doc.data().rating || 0), // Adicionar rating
+        reviews: Number(doc.data().reviews || 0), // Adicionar reviews
+        // Adicionar outras propriedades conforme a definição do tipo Activity
       })) as Activity[];
+
+      return activities;
     } catch (error) {
       console.error('Erro ao buscar atividades do instrutor:', error);
       throw error;
@@ -327,10 +409,34 @@ class ActivityService {
       );
 
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
+       const activities = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
+        // Converter campos para o tipo correto e fornecer fallbacks
+        price: Number(doc.data().price || 0),
+        status: doc.data().status || 'active',
+        instructorId: doc.data().instructorId || 'system',
+        instructorName:
+          doc.data().instructorName || doc.data().entrepreneur || 'Sistema', // Considerar entrepreneur como fallback para instructorName
+        enrolledStudents: doc.data().enrolledStudents || 0, // Adicionar enrolledStudents
+        image: doc.data().image || '', // Adicionar image
+        beach: doc.data().beach || '', // Adicionar beach
+        city: doc.data().city || '', // Adicionar city
+        horarios: Array.isArray(doc.data().horarios) ? doc.data().horarios.map((h: any) => ({ // Adicionar e mapear horarios
+           periodo: h.periodo || '',
+           horario: h.horario || '',
+           local: h.local || 'areia',
+           limiteAlunos: h.limiteAlunos || 0,
+           alunosMatriculados: h.alunosMatriculados || 0,
+           diaSemana: h.diaSemana || '',
+        })) : [],
+        description: doc.data().description || '', // Adicionar description
+        rating: Number(doc.data().rating || 0), // Adicionar rating
+        reviews: Number(doc.data().reviews || 0), // Adicionar reviews
+        // Adicionar outras propriedades conforme a definição do tipo Activity
       })) as Activity[];
+
+      return activities;
     } catch (error) {
       console.error('Erro ao buscar atividades por categoria:', error);
       throw error;
@@ -350,10 +456,34 @@ class ActivityService {
       );
 
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
+       const activities = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
+        // Converter campos para o tipo correto e fornecer fallbacks
+        price: Number(doc.data().price || 0),
+        status: doc.data().status || 'active',
+        instructorId: doc.data().instructorId || 'system',
+        instructorName:
+          doc.data().instructorName || doc.data().entrepreneur || 'Sistema', // Considerar entrepreneur como fallback para instructorName
+        enrolledStudents: doc.data().enrolledStudents || 0, // Adicionar enrolledStudents
+        image: doc.data().image || '', // Adicionar image
+        beach: doc.data().beach || '', // Adicionar beach
+        city: doc.data().city || '', // Adicionar city
+        horarios: Array.isArray(doc.data().horarios) ? doc.data().horarios.map((h: any) => ({ // Adicionar e mapear horarios
+           periodo: h.periodo || '',
+           horario: h.horario || '',
+           local: h.local || 'areia',
+           limiteAlunos: h.limiteAlunos || 0,
+           alunosMatriculados: h.alunosMatriculados || 0,
+           diaSemana: h.diaSemana || '',
+        })) : [],
+        description: doc.data().description || '', // Adicionar description
+        rating: Number(doc.data().rating || 0), // Adicionar rating
+        reviews: Number(doc.data().reviews || 0), // Adicionar reviews
+        // Adicionar outras propriedades conforme a definição do tipo Activity
       })) as Activity[];
+
+      return activities;
     } catch (error) {
       console.error('Erro ao buscar atividades por localização:', error);
       throw error;
@@ -371,7 +501,7 @@ class ActivityService {
       const activityRef = doc(db, this.activitiesCollection, id);
       await updateDoc(activityRef, {
         status,
-        updatedAt: Date.now(),
+        updatedAt: serverTimestamp(), // Usar serverTimestamp
       });
     } catch (error) {
       console.error('Erro ao atualizar status da atividade:', error);
@@ -394,6 +524,7 @@ class ActivityService {
 
   /**
    * Atualiza todas as atividades existentes com o instructorId do paulo@hotmail.com
+   * (Função de migração/teste - remover em produção)
    */
   async updateExistingActivities() {
     try {
@@ -405,9 +536,9 @@ class ActivityService {
       snapshot.docs.forEach(doc => {
         const activityRef = doc.ref;
         batch.update(activityRef, {
-          instructorId: 'paulo@hotmail.com',
-          instructorName: 'Paulo',
-          updatedAt: Date.now(),
+          instructorId: 'paulo@hotmail.com', // ID do instrutor para teste
+          instructorName: 'Paulo', // Nome do instrutor para teste
+          updatedAt: serverTimestamp(), // Usar serverTimestamp
         });
       });
 
@@ -419,22 +550,27 @@ class ActivityService {
     }
   }
 
+  // Este método createEnrollment parece deslocado em ActivityService.
+  // Ele deveria estar em EnrollmentService. Removendo daqui.
+  /*
   async createEnrollment(enrollment: {
     activityId: string;
     studentId: string;
     studentName: string;
-    status: 'active' | 'cancelled';
+    status: 'active' | 'cancelled'; // Status aqui parece incorreto para EnrollmentStatus
     paymentStatus: 'pending' | 'paid' | 'refunded';
     paymentMethod: 'pix' | 'credit_card';
     amount: number;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt: Date; // Usar serverTimestamp
+    updatedAt: Date; // Usar serverTimestamp
   }) {
     try {
       const enrollmentRef = doc(collection(db, 'enrollments'));
       await setDoc(enrollmentRef, {
         ...enrollment,
         id: enrollmentRef.id,
+        createdAt: serverTimestamp(), // Usar serverTimestamp
+        updatedAt: serverTimestamp(), // Usar serverTimestamp
       });
 
       // Atualizar contador de alunos matriculados na atividade
@@ -446,13 +582,14 @@ class ActivityService {
       throw error;
     }
   }
+  */
 
   async reactivateActivity(activityId: string): Promise<void> {
     try {
       const activityRef = doc(db, this.activitiesCollection, activityId);
       await updateDoc(activityRef, {
         status: 'active',
-        updatedAt: new Date(),
+        updatedAt: serverTimestamp(), // Usar serverTimestamp
       });
     } catch (error) {
       console.error('Erro ao reativar atividade:', error);

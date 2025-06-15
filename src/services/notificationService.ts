@@ -16,8 +16,8 @@ import {
   limit,
   startAfter,
   writeBatch,
-} from 'firebase/firestore';
-import { EnrollmentStatus, NotificationType, type Notification } from '@/types';
+} from 'firebase/firestore'; // Assuming Notification type is correctly imported from '@/types' and exported there
+import { EnrollmentStatus, NotificationType, type Notification } from '@/types'; // Assuming Notification type is correctly imported from '@/types' and exported there
 
 class NotificationService {
   private notificationsCollection = 'notifications';
@@ -66,6 +66,19 @@ class NotificationService {
     } catch (error) {
       console.error('Erro ao criar notificação:', error);
       throw error;
+    }
+  }
+
+  /**
+ * Atualiza campos de uma notificação
+ */
+  async updateNotificationFields(id: string, fields: { [key: string]: any }): Promise<void> {
+    try {
+      const notificationRef = doc(db, this.notificationsCollection, id);
+ await updateDoc(notificationRef, fields);
+    } catch (error) {
+ console.error('Erro ao atualizar notificação:', error);
+ throw error;
     }
   }
 
