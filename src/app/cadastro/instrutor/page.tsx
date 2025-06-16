@@ -13,7 +13,7 @@ export default function CadastroInstrutorPage() {
   const [aceiteTermos, setAceiteTermos] = useState(false);
   
   const [formData, setFormData] = useState({
-    nomeCompleto: '',
+    name: '',
     email: '',
     senha: '',
     confirmarSenha: '',
@@ -86,7 +86,7 @@ export default function CadastroInstrutorPage() {
     try {
       // Dados do usuário a serem salvos
       const userData = {
-        nomeCompleto: formData.nomeCompleto,
+        name: formData.name,
         cidade: formData.cidade,
         praiaPrincipal: formData.praiaPrincipal,
         linkRede: formData.linkRede || null,
@@ -149,16 +149,16 @@ export default function CadastroInstrutorPage() {
             
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
-                <label htmlFor="nomeCompleto" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                   Nome completo
                 </label>
                 <div className="mt-1">
                   <input
-                    id="nomeCompleto"
-                    name="nomeCompleto"
+                    id="name"
+                    name="name"
                     type="text"
                     required
-                    value={formData.nomeCompleto}
+                    value={formData.name}
                     onChange={handleInputChange}
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />

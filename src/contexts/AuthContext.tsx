@@ -100,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Create new user profile with default role
             storedUserData = {
               email: user.email,
+              name: user.displayName || user.email || '',
               createdAt: serverTimestamp(),
               lastLogin: serverTimestamp(),
               role: 'student' // default role
