@@ -80,6 +80,26 @@ export default function InstrutorDashboard() {
     }
   };
 
+  const handleMarkAllAsRead = async () => {
+    const unreadNotifications = notifications.filter(
+      (notification) => !notification.read
+    );
+
+    if (unreadNotifications.length === 0) {
+      return; // Nada para marcar como lido
+    }
+
+    try {
+      // Use Promise.all para atualizar todas as notificações não lidas em paralelo
+      await Promise.all(
+        unreadNotifications.map((notification) =>
+          notificationService.updateNotificationFields(notification.id, { read: true })
+        )
+      );
+    } catch (error) {
+      console.error('Erro ao marcar todas as notificações como lidas:', error);
+    }
+  };
   const handleConfirmEnrollment = async (id: string) => {
     try {
       await enrollmentService.confirmEnrollment(id);
@@ -154,6 +174,13 @@ export default function InstrutorDashboard() {
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-medium text-gray-900">Notificações</h3>
+                  {/* Botão Marcar todas como lidas */}
+                  {notifications.some(n => !n.read) && (
+ <button
+                      onClick={handleMarkAllAsRead}
+                      className="text-sm text-orange-600 hover:text-orange-700"
+                    >Marcar todas como lidas</button>
+                  )}
                   <button
                     onClick={() => setShowNotifications(false)}
                     className="text-gray-400 hover:text-gray-500"

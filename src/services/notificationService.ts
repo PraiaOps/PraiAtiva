@@ -23,6 +23,19 @@ class NotificationService {
   private notificationsCollection = 'notifications';
 
   /**
+ * Deleta uma notificação pelo ID.
+ */
+  async deleteNotification(id: string): Promise<void> {
+    try {
+      const notificationRef = doc(db, this.notificationsCollection, id);
+      await deleteDoc(notificationRef);
+    } catch (error) {
+      console.error('Erro ao deletar notificação:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Cria uma notificação base com tratamento de erros
    */
   private async createBaseNotification(data: {
@@ -244,26 +257,6 @@ class NotificationService {
     }
   }
 
-  /**
-   * Deleta uma notificação
-   */
-  async deleteNotification(notificationId: string): Promise<void> {
-    try {
-      const notificationRef = doc(
-        db,
-        this.notificationsCollection,
-        notificationId
-      );
-      await deleteDoc(notificationRef);
-    } catch (error) {
-      console.error('Erro ao deletar notificação:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Deleta todas as notificações de um usuário
-   */
   async deleteAllUserNotifications(userId: string): Promise<void> {
     try {
       const q = query(
