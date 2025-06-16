@@ -96,6 +96,7 @@ export default function AtividadesPage() {
   const [selectedWeekDay, setSelectedWeekDay] = useState('all');
   const [isPriceOpen, setIsPriceOpen] = useState(false);
   const [priceRange, setPriceRange] = useState([0, 500]);
+  const [isPriceFilterApplied, setIsPriceFilterApplied] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   // Novo: animação de painel de filtros
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -132,8 +133,7 @@ export default function AtividadesPage() {
       activity.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = selectedType === 'all' || activity.type === selectedType;
-    const matchesPrice =
-      activity.price >= priceRange[0] && activity.price <= priceRange[1];
+    const matchesPrice = !isPriceFilterApplied || (activity.price >= priceRange[0] && activity.price <= priceRange[1]);
     const matchesCity = selectedCity === 'all' || activity.city === selectedCity;
     const matchesBeach = selectedBeach === 'all' || activity.beach === selectedBeach;
     // Corrigido: filtro de local verifica os horários
@@ -158,10 +158,11 @@ export default function AtividadesPage() {
     const newRange = [...priceRange];
     newRange[index] = parseInt(e.target.value);
     setPriceRange(newRange);
+    setIsPriceFilterApplied(true);
   };
 
   // Calendário semanal visual
-  function WeeklyCalendar({ activities, selectedLocal, selectedWeekDay, selectedType, selectedCity, selectedBeach, priceRange }: any) {
+  function WeeklyCalendar({ activities, selectedLocal, selectedWeekDay, selectedType, selectedCity, selectedBeach, priceRange, isPriceFilterApplied }: any) {
     // Filtra horários conforme filtros ativos
     const dias = [
       { id: 'segunda', name: 'Segunda' },
@@ -184,7 +185,7 @@ export default function AtividadesPage() {
           (selectedType === 'all' || activity.type === selectedType) &&
           (selectedCity === 'all' || activity.city === selectedCity) &&
           (selectedBeach === 'all' || activity.beach === selectedBeach) &&
-          (activity.price >= priceRange[0] && activity.price <= priceRange[1])
+          (!isPriceFilterApplied || (activity.price >= priceRange[0] && activity.price <= priceRange[1]))
         ) {
           horariosPorDia[h.diaSemana]?.push({ ...h, activity });
         }
@@ -378,6 +379,7 @@ export default function AtividadesPage() {
                         selectedCity={selectedCity}
                         selectedBeach={selectedBeach}
                         priceRange={priceRange}
+                        isPriceFilterApplied={isPriceFilterApplied}
                       />
                     </div>
                   )}
@@ -408,7 +410,7 @@ export default function AtividadesPage() {
                     <input
                       type="range"
                       min={0}
-                      max={500}
+                      max={1000000}
                       step={10}
                       value={priceRange[0]}
                       onChange={(e) => handlePriceChange(e, 0)}
@@ -418,7 +420,7 @@ export default function AtividadesPage() {
                     <input
                       type="range"
                       min={0}
-                      max={500}
+                      max={1000000}
                       step={10}
                       value={priceRange[1]}
                       onChange={(e) => handlePriceChange(e, 1)}
@@ -440,6 +442,7 @@ export default function AtividadesPage() {
                     setSelectedLocal('all');
                     setSelectedWeekDay('all');
                     setPriceRange([0, 500]);
+                    setIsPriceFilterApplied(false);
                     setSelectedBeach('all');
                   }}
                 >
